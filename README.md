@@ -33,7 +33,8 @@ npm install                 # one install for all workspaces
 npm run dev                 # all seven processes from the TypeScript sources (tsx), coloured logs, Ctrl-C stops all
 npm run smoke               # the two flows end to end against the gateway (services must be running)
 npm run typecheck           # tsc on every package; run before a PR
-npm test                    # node:test unit tests of every service (66)
+npm test                    # node:test: the unit tests of every service and the in-process end-to-end flows (69)
+npm run dev:mono            # monolith mode (ADR-14): the gateway and the six services in ONE process, calls in memory
 npm run dev:customer        # the Customer Web App on :5173 (proxies /api to the gateway)
 npm run dev:backoffice      # the Back-office Web App on :5174; sign in with manager/manager
 npm run build:frontend      # production build of the shared client and both apps
@@ -53,6 +54,22 @@ caller, the gateway included: its request builders are typed against the request
 
 Every service serves the standard `grpc.health.v1.Health/Check`; the gateway's `GET /health` calls each of them. The
 web apps are not part of progress 1: the demo uses curl and grpcurl.
+
+## Monolith mode (ADR-14)
+
+`npm run dev:mono` runs the whole backend as one process: the gateway's REST API on :4000 and the six services loaded
+into the same process, every call a function call. Nothing else changes: the same route table, the same `.proto`
+contracts, and every request and response still passes through the Protocol Buffers serializer of its method in
+memory, so defaults, optional fields and error codes behave exactly as over gRPC. Only the network, the deadlines and
+`UNAVAILABLE` are gone. Use it to debug a flow with one log and one stack trace, and for the end-to-end tests in
+`monolith/test/`, which `npm test` runs in milliseconds without ports or containers.
+
+How it works: each service has `src/api.ts`, its API layer (one function per method of its `.proto`, request message
+in, response message out), which `src/grpc.ts` serves over gRPC. `monolith/src/wire.ts` is the one composition root
+that knows every service: it points the client objects of the gateway and of the services at the API layers of the
+other services (`monolith/src/inprocess.ts`). No service imports another service. The monolith is never the
+deployment target: the MVP is deployed as the seven processes of `docker-compose.yml`, and `npm run smoke` against
+them stays the check that serialization, metadata and deadlines behave over the wire.
 
 ## Progress 1 stubs (say so in the video)
 

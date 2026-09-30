@@ -6,7 +6,7 @@ owning service's `src/model.ts`, derived from the data model in [data-model.md](
 the only REST API of the system (ADR-12): each route below is one gRPC call on the owning service. The path
 parameters, the query and the JSON body become the request message, the response message is the JSON answer, and
 the caller's identity travels as the gRPC metadata `x-user-id` and `x-role` (fake auth in progress 1). A service
-never speaks REST, and a service never calls another service through the gateway.
+never speaks REST, and a service never calls another service through the gateway. Each service serves its contract from `src/api.ts`, its API layer, which `src/grpc.ts` exposes over gRPC and which the monolith mode of `monolith/` calls in-process (ADR-14).
 
 ## API Gateway (REST :4000)
 

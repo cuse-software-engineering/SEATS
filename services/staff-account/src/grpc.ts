@@ -1,49 +1,26 @@
-// gRPC transport of the Staff Account Service, its only API (ADR-12): loads the contract and maps DomainError to gRPC
-// status codes; a refused sign-in is UNAUTHENTICATED (401 at the gateway). No rules here.
+// gRPC transport of the Staff Account Service, its only API (ADR-12): the API layer of api.ts served over gRPC plus the
+// standard health check. No rules here.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
+import type { CallContext } from '@seats/proto/api';
 import type { ProtoGrpcType } from '@seats/proto/gen/staff_account';
 import type { ProtoGrpcType as HealthProto } from '@seats/proto/gen/health';
-import type { HealthHandlers } from '@seats/proto/gen/grpc/health/v1/Health';
 import type { StaffAccountsHandlers } from '@seats/proto/gen/seats/staffaccount/v1/StaffAccounts';
-import * as domain from './domain.js';
+import type { HealthHandlers } from '@seats/proto/gen/grpc/health/v1/Health';
+import { api, toServiceError } from './api.js';
 
 const PROTO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../proto');
 const OPTS = { keepCase: false, longs: Number, defaults: true };
 const pkg = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(PROTO_DIR, 'staff_account.proto'), OPTS)) as unknown as ProtoGrpcType;
 const health = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(PROTO_DIR, 'health.proto'), OPTS)) as unknown as HealthProto;
 
-const CODES: Record<number, grpc.status> = { 400: grpc.status.INVALID_ARGUMENT, 401: grpc.status.UNAUTHENTICATED, 404: grpc.status.NOT_FOUND, 409: grpc.status.FAILED_PRECONDITION, 501: grpc.status.UNIMPLEMENTED };
-
-function toGrpcError(e: unknown): grpc.ServiceError {
-  if (e instanceof domain.DomainError) {
-    const metadata = new grpc.Metadata();
-    if (e.details !== undefined) metadata.set('error-details-bin', Buffer.from(JSON.stringify(e.details)));
-    return Object.assign(new Error(e.message), { code: CODES[e.status] ?? grpc.status.INTERNAL, details: e.message, metadata });
-  }
-  const message = e instanceof Error ? e.message : String(e);
-  return Object.assign(new Error(message), { code: grpc.status.INTERNAL, details: message, metadata: new grpc.Metadata() });
-}
-
-const unary = <Req, Res>(fn: (req: Req) => Res): grpc.handleUnaryCall<Req, Res> => (call, callback) => {
-  try {
-    callback(null, fn(call.request));
-  } catch (e) {
-    callback(toGrpcError(e));
-  }
+const ctxOf = (md: grpc.Metadata): CallContext => ({ caller: md.get('x-user-id')[0]?.toString(), role: md.get('x-role')[0]?.toString() });
+const unary = (fn: (request: any, ctx: CallContext) => unknown): grpc.handleUnaryCall<any, any> => (call, callback) => {
+  Promise.resolve().then(() => fn(call.request, ctxOf(call.metadata))).then((res) => callback(null, res), (e: unknown) => callback(toServiceError(e)));
 };
-
-const handlers: StaffAccountsHandlers = {
-  SignIn: unary(domain.signIn),
-  SignOut: unary(domain.signOut),
-  CreateStaffAccount: unary(domain.createStaffAccount),
-  ListStaffAccounts: unary(() => ({ accounts: domain.listStaffAccounts() })),
-  UpdateStaffAccount: unary(domain.updateStaffAccount),
-  DisableStaffAccount: unary(domain.disableStaffAccount),
-};
-
+const handlers = Object.fromEntries(Object.entries(api).map(([name, fn]) => [name, unary(fn as (request: any, ctx: CallContext) => unknown)])) as unknown as StaffAccountsHandlers;
 const healthHandlers: HealthHandlers = { Check: (_call, callback) => callback(null, { status: 1 }) };   // SERVING
 
 export function startGrpc(port: number): grpc.Server {

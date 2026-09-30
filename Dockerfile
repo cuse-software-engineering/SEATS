@@ -7,6 +7,7 @@ ENV SERVICE=$SERVICE
 COPY package.json tsconfig.base.json ./
 COPY proto/package.json proto/
 COPY gateway/package.json gateway/
+COPY monolith/package.json monolith/
 COPY services/concert-round/package.json services/concert-round/
 COPY services/table-availability/package.json services/table-availability/
 COPY services/booking/package.json services/booking/
@@ -16,6 +17,7 @@ COPY services/staff-account/package.json services/staff-account/
 RUN npm install
 COPY proto ./proto
 COPY gateway ./gateway
+COPY monolith ./monolith
 COPY services ./services
 RUN npm run build
 CMD ["sh", "-c", "node $SERVICE/dist/server.js"]
