@@ -1,12 +1,27 @@
 {
   "name": "seats",
   "private": true,
-  "description": "SEATS — Seating & Event Availability Tracking System. Microservices of the 2110521 group project (SE 101).",
-  "workspaces": ["gateway", "services/*"],
+  "description": "SEATS \u2014 Seating & Event Availability Tracking System. Microservices of the 2110521 group project (SE 101).",
+  "workspaces": [
+    "proto",
+    "gateway",
+    "services/*"
+  ],
   "scripts": {
-    "dev": "concurrently -n gateway,round,tables,booking -c green,magenta,cyan,yellow \"npm -w gateway start\" \"npm -w services/concert-round start\" \"npm -w services/table-availability start\" \"npm -w services/booking start\"",
+    "proto": "proto-loader-gen-types --keepCase=false --longs=Number --defaults=true --grpcLib=@grpc/grpc-js --outDir=proto/gen proto/*.proto",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "dev": "concurrently -n gateway,round,tables,booking -c green,magenta,cyan,yellow \"npm -w gateway run dev\" \"npm -w services/concert-round run dev\" \"npm -w services/table-availability run dev\" \"npm -w services/booking run dev\"",
     "smoke": "node demo/smoke.mjs"
   },
-  "devDependencies": { "concurrently": "^9.1.0" },
-  "engines": { "node": ">=20" }
+  "devDependencies": {
+    "@grpc/proto-loader": "^0.7.13",
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }

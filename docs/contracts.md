@@ -1,6 +1,7 @@
 # Contracts
 
-Agreed before code (tasks.txt, section 2). Operation names are those of Table 5.3 of the project document.
+Agreed before code (tasks.txt, section 2). Operation names are those of Table 5.3 of the project document. The shape of
+every body is a type of the owning service's `src/model.ts`, derived from the data model in [data-model.md](data-model.md).
 Every REST call goes through the API Gateway, which strips `/api` and forwards to the owning service with the headers
 `x-user-id` and `x-role` (fake auth in progress 1). A service never calls another service's REST API: it uses gRPC.
 

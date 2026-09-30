@@ -1,0 +1,149 @@
+# Data model
+
+One database per service (ADR-06, Figure 5.1), so one diagram per service. A service never reads another service's
+database: a `roundId` in the Booking DB is a reference by identifier, not a foreign key, and what a service needs
+from another it asks by gRPC. The diagrams are the source of the types; the chain is
+
+```
+ER diagram (this file)  ->  src/model.ts of the service     the entities as TypeScript types, used by domain.ts and store.ts
+                        ->  proto/*.proto messages          the projection that crosses services (only what a caller needs)
+                        ->  REST bodies (contracts.md)      the model minus internals (parameters snapshot, version, …)
+```
+
+Change the diagram first, then `model.ts`, then the `.proto` (and `npm run proto`), then `contracts.md`.
+
+## Concert Round Service — Round DB (owner: Natchy)
+
+```mermaid
+erDiagram
+    ZONE_MAP ||--o{ ZONE : "has"
+    ZONE ||--o{ ZONE_MAP_TABLE : "contains"
+    TABLE_TYPE ||--o{ ZONE_MAP_TABLE : "types"
+    ZONE_MAP ||--o{ ROUND : "is used by"
+    ROUND ||--o{ PACKAGE_PRICE : "prices"
+    BUSINESS_PARAMETERS ||--o{ ROUND : "in force at publish"
+
+    ZONE_MAP {
+        string id PK
+        string name
+        string status "Draft | Active"
+        string imageUrl "Media Storage Adapter"
+        string createdAt
+    }
+    ZONE {
+        string id PK
+        string name
+    }
+    ZONE_MAP_TABLE {
+        int tableNumber PK "unique in the map"
+        string zoneId FK
+        string tableTypeId FK
+        int capacity
+        int x
+        int y
+    }
+    TABLE_TYPE {
+        string id PK
+        string name
+        int capacity
+        string packageContent
+    }
+    ROUND {
+        string id PK
+        string name
+        string artist
+        string status "Draft | Published"
+        string date "YYYY-MM-DD"
+        string doorsOpenAt
+        string startAt
+        string bookingOpenAt "BRULE-07"
+        string zoneMapId FK
+        int[] tablesNotForSale
+        json checkInWindow "opensAt, startAt, graceEndsAt (BRULE-04, 05)"
+        json parameters "snapshot at publish (FR-38)"
+        string createdAt
+    }
+    PACKAGE_PRICE {
+        string zoneId FK
+        string tableTypeId FK
+        int packagePrice "THB, BRULE-08"
+        string packageContent
+    }
+    BUSINESS_PARAMETERS {
+        int holdPeriodMinutes "15, BRULE-02"
+        int checkInWindowHours "2, BRULE-04"
+        int gracePeriodMinutes "30, BRULE-05"
+        int extraPersonFee "600 THB, BRULE-09"
+    }
+```
+
+Stored as documents: a zone map is one document with its zones and tables embedded (ADR-06); a round embeds its prices,
+its check-in window and the snapshot of the parameters. What crosses to other services: `Round` (with the tables of its
+map, joined for the caller), `RoundPricing`, `CheckInWindow` (`proto/concert_round.proto`).
+
+## Table Availability Service — Table Status DB (owner: Will)
+
+```mermaid
+erDiagram
+    ROUND_TABLE_STATUS ||--|{ TABLE_STATUS : "one per table of the round"
+
+    ROUND_TABLE_STATUS {
+        string roundId PK "the round of the Concert Round Service (reference, not FK)"
+        int version "grows on every change; ETag of the polled read"
+    }
+    TABLE_STATUS {
+        int tableNumber PK
+        string status "AVAILABLE | HELD | BOOKED | OCCUPIED | NOT_FOR_SALE"
+        string bookingId "reference to the Booking DB"
+        string holdEndsAt "set by the Booking Service"
+    }
+```
+
+One document per round with its tables embedded, so `holdTable()` is one conditional update of one document
+(`findOneAndUpdate` with the expected status in the filter): exactly one of several concurrent holds succeeds (ADR-08,
+NFR-20). The gRPC messages are this model one to one.
+
+## Booking Service — Booking DB (owner: Peat SE)
+
+```mermaid
+erDiagram
+    CUSTOMER_PROFILE ||--o{ BOOKING : "makes"
+    BOOKING ||--o| FEE : "has, once the party size is set"
+
+    CUSTOMER_PROFILE {
+        string customerId PK "LINE user id (BRULE-12)"
+        string name
+        string phone "Thai mobile number"
+        string consentAt "PDPA consent (FR-10, BRULE-11)"
+    }
+    BOOKING {
+        string id PK
+        string customerId FK
+        string roundId "reference to the Round DB"
+        int tableNumber "reference to the Table Status DB"
+        string zoneId "copied from the round at hold time"
+        string zoneName
+        string tableTypeId
+        int capacity
+        string status "Held | Confirmed | Checked-in | Cancelled | Expired | No-show"
+        string holdEndsAt "BRULE-02; the expiry job owns it (ADR-08)"
+        int partySize
+        boolean termsAccepted "BRULE-16"
+        string createdAt
+    }
+    FEE {
+        int packagePrice
+        int extraPersons
+        int extraPersonFee
+        int fullTableFee "BRULE-01, BRULE-09"
+    }
+```
+
+The booking copies zone, table type and capacity from the round when the table is held, so that the fee and the ticket
+do not change if the map is edited later (BRULE-07). Progress 2 adds the e-ticket (signed booking reference), the
+payment reference and the check-in record (time, staff account) to `BOOKING`.
+
+## Not modelled yet
+
+Payment DB, Notification DB and Staff Account DB come with their services in progress 2; the message broker, service
+discovery and a relational database next to MongoDB are open decisions (KI-14 of the project document).

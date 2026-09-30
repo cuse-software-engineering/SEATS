@@ -1,0 +1,7 @@
+{
+  "name": "@seats/proto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The gRPC contracts (.proto) and the TypeScript types generated from them (npm run proto at the root)."
+}

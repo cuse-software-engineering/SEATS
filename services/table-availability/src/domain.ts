@@ -1,59 +1,59 @@
 // Table Availability Service — the operations of Table 5.3 (MVP), one function each. No transport code here.
 import { collection } from './store.js';
-
-export const STATUS = Object.freeze({ AVAILABLE: 'AVAILABLE', HELD: 'HELD', BOOKED: 'BOOKED', OCCUPIED: 'OCCUPIED', NOT_FOR_SALE: 'NOT_FOR_SALE' });
+import type { RoundCount, RoundTableStatus, RoundTableStatusView, TableStatus, TableStatusValue } from './model.js';
 
 export class DomainError extends Error {
-  constructor(status, message) { super(message); this.status = status; }   // status = HTTP-like code: 400, 404, 409
+  constructor(public readonly status: 400 | 404 | 409, message: string) { super(message); }
 }
 
-// roundId -> { roundId, version, tables: { [tableNumber]: { tableNumber, status, bookingId, holdEndsAt } } }
-const rounds = collection('roundTableStatus');
+const rounds = collection<RoundTableStatus>('roundTableStatus');
 
-const view = (r) => ({ roundId: r.roundId, version: r.version, tables: Object.values(r.tables).sort((a, b) => a.tableNumber - b.tableNumber) });
+const view = (r: RoundTableStatus): RoundTableStatusView =>
+  ({ roundId: r.roundId, version: r.version, tables: Object.values(r.tables).sort((a, b) => a.tableNumber - b.tableNumber) });
 
-function requireRound(roundId) {
+function requireRound(roundId: string): RoundTableStatus {
   const r = rounds.get(roundId);
   if (!r) throw new DomainError(404, `round ${roundId} has no table status`);
   return r;
 }
 
-function requireTable(round, tableNumber) {
+function requireTable(round: RoundTableStatus, tableNumber: number): TableStatus {
   const t = round.tables[tableNumber];
   if (!t) throw new DomainError(404, `table ${tableNumber} is not in round ${round.roundId}`);
   return t;
 }
 
 /** C — called by publishRound(): every table for sale becomes AVAILABLE, the others NOT_FOR_SALE. Idempotent on retry (UC-03 EF-2). */
-export function initializeRoundTableStatus({ roundId, tables }) {
+export function initializeRoundTableStatus({ roundId, tables }: { roundId: string; tables: { tableNumber: number; forSale?: boolean }[] }): RoundTableStatusView {
   if (!roundId || !tables?.length) throw new DomainError(400, 'roundId and tables are required');
   const existing = rounds.get(roundId);
   if (existing) return view(existing);
-  const r = { roundId, version: 1, tables: {} };
+  const r: RoundTableStatus = { roundId, version: 1, tables: {} };
   for (const t of tables) {
-    r.tables[t.tableNumber] = { tableNumber: t.tableNumber, status: t.forSale === false ? STATUS.NOT_FOR_SALE : STATUS.AVAILABLE, bookingId: '', holdEndsAt: '' };
+    r.tables[t.tableNumber] = { tableNumber: t.tableNumber, status: t.forSale === false ? 'NOT_FOR_SALE' : 'AVAILABLE', bookingId: '', holdEndsAt: '' };
   }
   return view(rounds.put(roundId, r));
 }
 
 /** R — the map every open web app polls (ADR-09). */
-export function getRoundTableStatus({ roundId }) {
+export function getRoundTableStatus({ roundId }: { roundId: string }): RoundTableStatusView {
   return view(requireRound(roundId));
 }
 
 /** R — sold-out status of the upcoming rounds (UC-01 step 3, AF-2). Unknown rounds count as 0 / 0. */
-export function countAvailableTables({ roundIds }) {
+export function countAvailableTables({ roundIds }: { roundIds: string[] }): { counts: RoundCount[] } {
   return {
     counts: (roundIds ?? []).map((id) => {
-      const ts = rounds.get(id) ? Object.values(rounds.get(id).tables) : [];
-      return { roundId: id, available: ts.filter((t) => t.status === STATUS.AVAILABLE).length, forSale: ts.filter((t) => t.status !== STATUS.NOT_FOR_SALE).length };
+      const r = rounds.get(id);
+      const ts = r ? Object.values(r.tables) : [];
+      return { roundId: id, available: ts.filter((t) => t.status === 'AVAILABLE').length, forSale: ts.filter((t) => t.status !== 'NOT_FOR_SALE').length };
     }),
   };
 }
 
 // One conditional check-and-set. Node runs it without interleaving; with MongoDB it is one findOneAndUpdate whose
 // filter carries the expected status, so exactly one of several concurrent callers succeeds (NFR-20).
-function transition(roundId, tableNumber, from, to, patch) {
+function transition(roundId: string, tableNumber: number, from: TableStatusValue[], to: TableStatusValue, patch: Partial<TableStatus>): TableStatus {
   const r = requireRound(roundId);
   const t = requireTable(r, tableNumber);
   if (!from.includes(t.status)) throw new DomainError(409, `table ${tableNumber} of round ${roundId} is ${t.status}, not ${from.join(' or ')}`);
@@ -63,39 +63,41 @@ function transition(roundId, tableNumber, from, to, patch) {
   return { ...t };
 }
 
+interface TableRef { roundId: string; tableNumber: number; bookingId?: string }
+
 /** U — AVAILABLE -> HELD: first lock wins (BRULE-03, FR-08). The Booking Service owns the timer (ADR-08). */
-export function holdTable({ roundId, tableNumber, bookingId, holdEndsAt }) {
+export function holdTable({ roundId, tableNumber, bookingId, holdEndsAt }: TableRef & { holdEndsAt?: string }): TableStatus {
   if (!bookingId) throw new DomainError(400, 'bookingId is required');
-  return transition(roundId, tableNumber, [STATUS.AVAILABLE], STATUS.HELD, { bookingId, holdEndsAt: holdEndsAt ?? '' });
+  return transition(roundId, tableNumber, ['AVAILABLE'], 'HELD', { bookingId, holdEndsAt: holdEndsAt ?? '' });
 }
 
 /** U — HELD -> AVAILABLE. Idempotent: an AVAILABLE table stays AVAILABLE, so the expiry job may retry (ADR-08). */
-export function releaseHold({ roundId, tableNumber, bookingId }) {
+export function releaseHold({ roundId, tableNumber, bookingId }: TableRef): TableStatus {
   const t = requireTable(requireRound(roundId), tableNumber);
-  if (t.status === STATUS.AVAILABLE) return { ...t };
+  if (t.status === 'AVAILABLE') return { ...t };
   if (bookingId && t.bookingId !== bookingId) throw new DomainError(409, `table ${tableNumber} is held by another booking`);
-  return transition(roundId, tableNumber, [STATUS.HELD], STATUS.AVAILABLE, { bookingId: '', holdEndsAt: '' });
+  return transition(roundId, tableNumber, ['HELD'], 'AVAILABLE', { bookingId: '', holdEndsAt: '' });
 }
 
 /** U — HELD -> BOOKED when the payment is confirmed (UC-01 step 19). */
-export function markTableBooked({ roundId, tableNumber, bookingId }) {
+export function markTableBooked({ roundId, tableNumber, bookingId }: TableRef): TableStatus {
   const t = requireTable(requireRound(roundId), tableNumber);
   if (bookingId && t.bookingId !== bookingId) throw new DomainError(409, `table ${tableNumber} is held by another booking`);
-  return transition(roundId, tableNumber, [STATUS.HELD], STATUS.BOOKED, { holdEndsAt: '' });
+  return transition(roundId, tableNumber, ['HELD'], 'BOOKED', { holdEndsAt: '' });
 }
 
 /** U — BOOKED -> OCCUPIED at check-in (UC-02 step 6). */
-export function markTableOccupied({ roundId, tableNumber, bookingId }) {
+export function markTableOccupied({ roundId, tableNumber, bookingId }: TableRef): TableStatus {
   const t = requireTable(requireRound(roundId), tableNumber);
   if (bookingId && t.bookingId !== bookingId) throw new DomainError(409, `table ${tableNumber} belongs to another booking`);
-  return transition(roundId, tableNumber, [STATUS.BOOKED], STATUS.OCCUPIED, {});
+  return transition(roundId, tableNumber, ['BOOKED'], 'OCCUPIED', {});
 }
 
 /** D — when a round is discarded. Refused while any table is held or booked. */
-export function removeRoundTableStatus({ roundId }) {
+export function removeRoundTableStatus({ roundId }: { roundId: string }): { removed: boolean } {
   const r = rounds.get(roundId);
   if (!r) return { removed: false };
-  const busy = Object.values(r.tables).filter((t) => [STATUS.HELD, STATUS.BOOKED, STATUS.OCCUPIED].includes(t.status));
+  const busy = Object.values(r.tables).filter((t) => ['HELD', 'BOOKED', 'OCCUPIED'].includes(t.status));
   if (busy.length) throw new DomainError(409, `round ${roundId} still has ${busy.length} held or booked table(s)`);
   return { removed: rounds.delete(roundId) };
 }

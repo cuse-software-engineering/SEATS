@@ -1,13 +1,16 @@
 // REST transport of the Concert Round Service: the route table of docs/contracts.md, nothing else.
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import * as d from './domain.js';
 
-const wrap = (fn) => async (req, res, next) => { try { res.json(await fn(req)); } catch (e) { next(e); } };
+type Handler = (req: Request<Record<string, string>>) => unknown;
+const wrap = (fn: Handler) => async (req: Request<Record<string, string>>, res: Response, next: NextFunction) => {
+  try { res.json(await fn(req)); } catch (e) { next(e); }
+};
 
 export function restApp() {
   const app = express();
   app.use(express.json());
-  app.get('/health', (_req, res) => res.json({ service: 'concert-round', ok: true }));
+  app.get('/health', (_req, res) => { res.json({ service: 'concert-round', ok: true }); });
 
   app.get('/business-parameters', wrap(() => d.getBusinessParameters()));
   app.put('/business-parameters', wrap((req) => d.updateBusinessParameters(req.body)));
@@ -15,7 +18,7 @@ export function restApp() {
   app.put('/table-types/:id', wrap((req) => d.defineTableType(req.params.id, req.body)));
 
   app.post('/zone-maps', wrap((req) => d.createZoneMap(req.body)));
-  app.get('/zone-maps', wrap((req) => d.listZoneMaps(req.query)));
+  app.get('/zone-maps', wrap((req) => d.listZoneMaps({ status: req.query.status as string | undefined })));
   app.get('/zone-maps/:id', wrap((req) => d.getZoneMap(req.params.id)));
   app.put('/zone-maps/:id', wrap((req) => d.updateZoneMap(req.params.id, req.body)));
   app.post('/zone-maps/:id/image', wrap((req) => d.uploadZoneMapImage(req.params.id, req.body)));
@@ -34,9 +37,10 @@ export function restApp() {
   app.post('/rounds/:id/publish', wrap((req) => d.publishRound(req.params.id)));
   app.delete('/rounds/:id', wrap((req) => d.discardDraftRound(req.params.id)));
 
-  app.use((err, _req, res, _next) => {
-    const status = err.status ?? (err.code !== undefined ? 502 : 500);                  // err.code: a gRPC error from a collaborator
-    res.status(status).json({ error: err.message, details: err.details });
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof d.DomainError) { res.status(err.status).json({ error: err.message, details: err.details }); return; }
+    const grpcError = typeof err === 'object' && err !== null && 'code' in err;                    // a collaborator refused or is down
+    res.status(grpcError ? 502 : 500).json({ error: err instanceof Error ? err.message : String(err) });
   });
   return app;
 }

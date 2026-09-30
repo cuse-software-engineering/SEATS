@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "API Gateway: the only entry for the web apps; fake auth by headers in progress 1; routes each request to the owning service.",
-  "scripts": { "start": "node src/server.js" },
-  "dependencies": { "express": "^5.1.0" }
+  "scripts": { "dev": "tsx src/server.ts", "build": "tsc -p .", "typecheck": "tsc -p . --noEmit", "start": "node dist/server.js" },
+  "dependencies": { "express": "^5.1.0" },
+  "devDependencies": { "@types/express": "^5.0.0" }
 }
