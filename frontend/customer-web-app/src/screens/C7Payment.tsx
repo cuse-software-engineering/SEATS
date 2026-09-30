@@ -48,7 +48,7 @@ export default function C7Payment() {
         <h4>Amount</h4>
         <p className="countdown">{fmtTHB(booking.data?.fee?.fullTableFee)}</p>
         {notBuilt && (
-          <div className="notice">
+          <div className="notice" data-testid="payment-notice">
             <strong>Payment comes in progress 2.</strong> The gateway answered {notBuilt.status}: {notBuilt.error}
           </div>
         )}

@@ -28,7 +28,7 @@ export default function C6BookingTerms() {
       <ErrorAlert error={action.error} onClose={action.clear} />
       <div className="card">
         {terms.data && (
-          <ol>{(terms.data.terms ?? []).map((t, i) => <li key={i}>{t}</li>)}</ol>
+          <ol data-testid="terms">{(terms.data.terms ?? []).map((t, i) => <li key={i}>{t}</li>)}</ol>
         )}
         {w && (
           <>

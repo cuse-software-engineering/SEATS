@@ -3,3 +3,5 @@ node_modules/
 *.log
 frontend/.next/
 dist/
+frontend/e2e/test-results/
+frontend/e2e/playwright-report/

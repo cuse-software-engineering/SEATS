@@ -50,7 +50,7 @@ export default function C4HoldAndBookingSummary() {
             {held && (
               <>
                 <h4>Time left to complete the booking</h4>
-                <div className="countdown">{mmss(remaining ?? 0)}</div>
+                <div className="countdown" data-testid="countdown">{mmss(remaining ?? 0)}</div>
                 <p className="small muted">Table {b.tableNumber} is held for you until {fmtDateTime(b.holdEndsAt)} (BRULE-02).</p>
               </>
             )}
@@ -65,7 +65,7 @@ export default function C4HoldAndBookingSummary() {
 
           <div className="card">
             <h4>Booking summary</h4>
-            <table className="data">
+            <table className="data" data-testid="summary">
               <tbody>
                 <tr><th>Round</th><td>{round.data ? `${round.data.name ?? ''} · ${round.data.artist ?? ''} · ${fmtDate(round.data.date)}` : b.roundId}</td></tr>
                 <tr><th>Table</th><td>#{b.tableNumber} · {b.zoneName ?? b.zoneId} · {b.tableTypeId} · {b.capacity} seats</td></tr>
@@ -79,7 +79,7 @@ export default function C4HoldAndBookingSummary() {
             <div className="row">
               <div className="stepper">
                 <button type="button" onClick={() => setSize(size - 1)} disabled={!held || action.busy || size <= 1} aria-label="fewer">−</button>
-                <span>{size}</span>
+                <span data-testid="party-size">{size}</span>
                 <button type="button" onClick={() => setSize(size + 1)} disabled={!held || action.busy} aria-label="more">+</button>
               </div>
               {b.partySize === undefined && held && <button type="button" className="secondary" onClick={() => setSize(size)} disabled={action.busy}>Set {size} people</button>}
@@ -87,11 +87,11 @@ export default function C4HoldAndBookingSummary() {
             </div>
             <h4>Fee</h4>
             {b.fee ? (
-              <table className="data">
+              <table className="data" data-testid="fee">
                 <tbody>
                   <tr><td>Package price (BRULE-08)</td><td className="num">{fmtTHB(b.fee.packagePrice)}</td></tr>
                   <tr><td>Extra persons: {b.fee.extraPersons ?? 0} × {fmtTHB(b.fee.extraPersonFee)}</td><td className="num">{fmtTHB((b.fee.extraPersons ?? 0) * (b.fee.extraPersonFee ?? 0))}</td></tr>
-                  <tr><th>Full table fee (BRULE-01)</th><th className="num">{fmtTHB(b.fee.fullTableFee)}</th></tr>
+                  <tr><th>Full table fee (BRULE-01)</th><th className="num" data-testid="fee-total">{fmtTHB(b.fee.fullTableFee)}</th></tr>
                 </tbody>
               </table>
             ) : <p className="muted small">Set the party size to see the full table fee.</p>}

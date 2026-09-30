@@ -19,7 +19,8 @@
     "dev:customer": "npm -w frontend/customer-web-app run dev",
     "dev:backoffice": "npm -w frontend/back-office-web-app run dev",
     "build:frontend": "npm run build -w frontend/shared -w frontend/customer-web-app -w frontend/back-office-web-app",
-    "dev:mono": "npm -w monolith run dev"
+    "dev:mono": "npm -w monolith run dev",
+    "test:e2e": "npm -w frontend/e2e run e2e"
   },
   "devDependencies": {
     "@grpc/proto-loader": "^0.7.13",

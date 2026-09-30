@@ -178,8 +178,13 @@ export async function updateRound(id: string, patch: RoundPatch): Promise<Round 
   const allowed: readonly RoundField[] = !bookingOpen ? ROUND_FIELDS : booked === 0 ? ['name', 'artist', 'date', 'doorsOpenAt', 'startAt'] : ['name', 'artist'];
   const refused = (Object.keys(patch) as RoundField[]).filter((k) => ROUND_FIELDS.includes(k) && !allowed.includes(k));
   if (refused.length) throw new DomainError(409, `after the booking-open time these fields are fixed: ${refused.join(', ')}`, { confirmedBookings: booked });
+  const before = { zoneMapId: r.zoneMapId, tablesNotForSale: [...r.tablesNotForSale] };
   applyPatch(r, patch, allowed);
   r.checkInWindow = deriveCheckInWindow(r.startAt, r.parameters ?? getBusinessParameters());
+  if (r.zoneMapId !== before.zoneMapId || r.tablesNotForSale.join() !== before.tablesNotForSale.join()) {   // AF-3 step 2, before booking opens: the table map follows
+    await tableAvailability.removeRoundTableStatus(id);
+    await tableAvailability.createRoundTableStatus({ roundId: id, tables: tablesOf(r).map((t) => ({ tableNumber: t.tableNumber, forSale: t.forSale })) });
+  }
   return { ...rounds.put(id, r), confirmedBookings: booked };
 }
 

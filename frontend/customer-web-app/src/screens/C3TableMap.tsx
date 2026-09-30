@@ -37,8 +37,8 @@ export default function C3TableMap() {
       <ErrorAlert error={tables.error} />
       <ErrorAlert error={pollError} />
       <ErrorAlert error={hold.error} onClose={hold.clear} />
-      <div className="card">
-        <div className="counts">
+      <div className="card" data-testid="table-map">
+        <div className="counts" data-testid="counts">
           <div><strong>{counts.AVAILABLE}</strong>available</div>
           <div><strong>{counts.HELD}</strong>held</div>
           <div><strong>{counts.BOOKED}</strong>booked</div>

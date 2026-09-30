@@ -127,7 +127,7 @@ export default function B3RoundEditor() {
           {r && (
             <>
               <div className="card">
-                <div className="row">
+                <div className="row" data-testid="round-head">
                   <h2 style={{ margin: 0 }}>{r.name || '(unnamed)'}</h2>
                   <Badge solid={published}>{r.status}</Badge>
                   <code className="small muted">{r.id}</code>
@@ -148,7 +148,7 @@ export default function B3RoundEditor() {
                 {r.checkInWindow && <p className="small muted">Check-in window: {fmtDateTime(r.checkInWindow.opensAt)} until {fmtDateTime(r.checkInWindow.graceEndsAt)} (BRULE-04, BRULE-05).</p>}
 
                 <h3>Package price per zone and table type (BRULE-08)</h3>
-                <table className="data">
+                <table className="data" data-testid="prices">
                   <thead><tr><th>Zone</th><th>Table type</th><th>Price (THB)</th><th>Package content</th><th></th></tr></thead>
                   <tbody>
                     {form.prices.map((p, i) => (
@@ -170,7 +170,7 @@ export default function B3RoundEditor() {
                   {!published && <button type="button" className="secondary" onClick={discard} disabled={action.busy}>Discard</button>}
                 </div>
                 {validation && (
-                  <div className={validation.valid ? 'notice' : 'alert'}>
+                  <div className={validation.valid ? 'notice' : 'alert'} data-testid="validation">
                     {validation.valid ? 'The round is valid.' : 'The round is not valid:'}
                     {validation.problems && validation.problems.length > 0 && <ul className="problems">{validation.problems.map((p, i) => <li key={i}>{p}</li>)}</ul>}
                   </div>
@@ -183,7 +183,7 @@ export default function B3RoundEditor() {
               <div className="card">
                 <h4>Preview as the customer sees it (C3)</h4>
                 {perZone.size > 0 && (
-                  <table className="data" style={{ marginBottom: 12 }}>
+                  <table className="data" style={{ marginBottom: 12 }} data-testid="preview-summary">
                     <thead><tr><th>Zone</th><th className="num">Tables for sale</th><th className="num">Capacity</th></tr></thead>
                     <tbody>{[...perZone.entries()].map(([id, z]) => <tr key={id}><td>{z.name}</td><td className="num">{z.forSale}</td><td className="num">{z.capacity}</td></tr>)}</tbody>
                   </table>

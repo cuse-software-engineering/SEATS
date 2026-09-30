@@ -1,7 +1,7 @@
 // The API layer of the Concert Round Service: one function per method of concert_round.proto, from the request message
 // to the response message (ADR-14). grpc.ts wraps it as the gRPC server; the monolith mode calls it in-process.
 import grpc from '@grpc/grpc-js';
-import type { ApiOf } from '@seats/proto/api';
+import type { ApiOf, CallContext } from '@seats/proto/api';
 import type { ConcertRoundHandlers } from '@seats/proto/gen/seats/concertround/v1/ConcertRound';
 import type { Round } from '@seats/proto/gen/seats/concertround/v1/Round';
 import type { Round as RoundRecord } from './model.js';
@@ -31,6 +31,12 @@ const toRound = (r: RoundRecord & { confirmedBookings?: number }): Round => ({
   tables: d.getRoundTables(r.id).map((t) => ({ ...t, packagePrice: t.packagePrice ?? undefined })),
 });
 
+/** A Draft round is the Manager's: a Customer who asks for it by id gets NOT_FOUND (UC-03 AF-1). */
+const visible = <R extends { id: string; status: string }>(r: R, ctx: CallContext): R => {
+  if (ctx.role === 'customer' && r.status !== 'Published') throw new d.DomainError(404, `round ${r.id} not found`);
+  return r;
+};
+
 export const api: ApiOf<ConcertRoundHandlers> = {
   DefineTableType: ({ id, ...type }) => d.defineTableType(id, type),
   ListTableTypes: () => ({ tableTypes: d.listTableTypes() }),
@@ -48,8 +54,8 @@ export const api: ApiOf<ConcertRoundHandlers> = {
 
   CreateRound: ({ name }) => toRound(d.createRound({ name })),
   GetUpcomingRounds: async () => ({ rounds: await d.getUpcomingRounds() }),
-  GetRound: ({ roundId }) => toRound(d.getRound(roundId)),
-  GetRoundTables: ({ roundId }) => ({ tables: d.getRoundTables(roundId).map((t) => ({ ...t, packagePrice: t.packagePrice ?? undefined })) }),
+  GetRound: ({ roundId }, ctx) => toRound(visible(d.getRound(roundId), ctx)),
+  GetRoundTables: ({ roundId }, ctx) => ({ tables: d.getRoundTables(visible(d.getRound(roundId), ctx).id).map((t) => ({ ...t, packagePrice: t.packagePrice ?? undefined })) }),
   UpdateRound: async ({ roundId, tablesNotForSale, prices, ...fields }) =>
     toRound(await d.updateRound(roundId, { ...defined(fields), ...(tablesNotForSale ? { tablesNotForSale: tablesNotForSale.values } : {}), ...(prices ? { prices: prices.values } : {}) })),
   ValidateRound: ({ roundId }) => d.validateRound(roundId),

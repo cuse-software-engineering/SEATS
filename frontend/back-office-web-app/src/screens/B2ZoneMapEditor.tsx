@@ -110,7 +110,7 @@ export default function B2ZoneMapEditor() {
           {m && (
             <>
               <div className="card">
-                <div className="row">
+                <div className="row" data-testid="map-head">
                   <h2 style={{ margin: 0 }}>{m.name || '(unnamed)'}</h2>
                   <Badge solid={m.status === 'Active'}>{m.status}</Badge>
                   <code className="small muted">{m.id}</code>
@@ -123,7 +123,7 @@ export default function B2ZoneMapEditor() {
                 {m.imageUrl && <p className="small muted">Image: <code>{m.imageUrl}</code> (the media upload is a stub, progress 1)</p>}
 
                 <h3>Zones</h3>
-                <table className="data">
+                <table className="data" data-testid="zones">
                   <thead><tr><th>Id</th><th>Name</th><th></th></tr></thead>
                   <tbody>
                     {zones.map((z, i) => (
@@ -138,7 +138,7 @@ export default function B2ZoneMapEditor() {
                 <div className="row"><button type="button" className="secondary" onClick={() => setZones((zs) => [...zs, { id: String.fromCharCode(65 + zs.length), name: '' }])}>Add zone</button></div>
 
                 <h3>Tables</h3>
-                <table className="data">
+                <table className="data" data-testid="tables">
                   <thead><tr><th>#</th><th>Zone</th><th>Table type</th><th>Seats</th><th>x</th><th>y</th><th></th></tr></thead>
                   <tbody>
                     {tables.map((t, i) => (
@@ -162,7 +162,7 @@ export default function B2ZoneMapEditor() {
                   {m.status === 'Draft' && <button type="button" className="secondary" onClick={discard} disabled={action.busy}>Discard</button>}
                 </div>
                 {validation && (
-                  <div className={validation.valid ? 'notice' : 'alert'}>
+                  <div className={validation.valid ? 'notice' : 'alert'} data-testid="validation">
                     {validation.valid ? 'The map is valid.' : 'The map is not valid:'}
                     {validation.problems && validation.problems.length > 0 && <ul className="problems">{validation.problems.map((p, i) => <li key={i}>{p}</li>)}</ul>}
                   </div>
@@ -170,7 +170,7 @@ export default function B2ZoneMapEditor() {
               </div>
               <div className="card">
                 <h4>Tables and capacity per zone (as saved)</h4>
-                <table className="data">
+                <table className="data" data-testid="zone-summary">
                   <thead><tr><th>Zone</th><th className="num">Tables</th><th className="num">Capacity</th></tr></thead>
                   <tbody>{(m.summary ?? []).map((s) => <tr key={s.zoneId}><td>{s.zoneId} {s.name}</td><td className="num">{s.tables}</td><td className="num">{s.capacity}</td></tr>)}</tbody>
                 </table>

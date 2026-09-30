@@ -60,7 +60,7 @@ export default function C5CustomerProfileAndConsent() {
         {isNew && (
           <label className="check"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /><span>I consent to the collection of my name and phone number for this booking.</span></label>
         )}
-        {problem && <div className="alert" role="alert">{problem}</div>}
+        {problem && <div className="alert" role="alert" data-testid="profile-problem">{problem}</div>}
         <div className="row">
           <button type="submit" disabled={action.busy || profile.loading}>{profile.data ? 'Confirm and continue' : 'Continue'}</button>
           <button type="button" className="secondary" onClick={decline} disabled={action.busy}>Decline and cancel the booking</button>

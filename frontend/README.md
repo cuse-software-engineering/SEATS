@@ -28,6 +28,29 @@ Other scripts, at the root: `npm run typecheck` (every package, the apps include
 three packages; the bundles land in `frontend/*/dist/`), `npm run api-types -w frontend/shared` (regenerate
 `frontend/shared/src/api-types.d.ts` after a change to `docs/openapi.yaml`; the generated file is committed).
 
+## End-to-end tests
+
+`frontend/e2e/` (`@seats/e2e`) drives both web apps in Chromium with [Playwright](https://playwright.dev), one test
+per flow of the use-case descriptions of the project document (Section 2.2), on the real screens; the gateway API is
+used only to seed data as the manager (fake-auth headers, as `demo/smoke.mjs` does), on a free random future date so
+that runs never overlap.
+
+```bash
+npm install                 # once; then, once per machine: npx playwright install chromium
+npm run test:e2e            # from the repo root; add -- --ui to watch, -- --project=customer for one app
+```
+
+`frontend/e2e/playwright.config.ts` starts what is not already running: `npm run dev:mono` (the backend as one
+process on :4000), `npm run dev:customer` (:5173) and `npm run dev:backoffice` (:5174), all from the repo root, and
+stops what it started. Two projects: `customer` (`uc-01`, `uc-09`) and `backoffice` (`uc-03`, `uc-04`, `uc-08`).
+Traces and screenshots are kept for failed tests only (`frontend/e2e/test-results/`, git-ignored).
+
+**Naming rule**: one file per use case (`tests/uc-NN.spec.ts`) and every test is named exactly
+`<UC id> <flow id> <flow title>` as the document names the flow, for example `UC-01 AF-3 Table Just Taken by Another
+Customer` or `UC-03 basic flow Create Concert Round`; the backend traceability script matches on that prefix. The
+screens carry a few `data-testid` attributes (`counts`, `countdown`, `fee-total`, `validation`, `map-head`,
+`round-head`, …) where a heading or a button name is not a stable selector.
+
 ## Fake authentication (progress 1)
 
 The gateway trusts two headers, `x-user-id` and `x-role` (`customer`, `manager`, `front_staff`, `owner`), and the
