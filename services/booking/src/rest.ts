@@ -16,7 +16,6 @@ export function restApp() {
   app.post('/bookings', wrap((req, me) => d.createHeldBooking(me, req.body)));
   app.get('/bookings/:id', wrap((req, me) => d.getBooking(req.params.id, me)));
   app.put('/bookings/:id/party-size', wrap((req, me) => d.setPartySize(req.params.id, me, req.body)));
-  app.get('/bookings/:id/fee', wrap((req, me) => d.calculateTableFee(req.params.id, me)));
   app.get('/bookings/:id/terms', wrap((req, me) => d.getBookingTerms(req.params.id, me)));
   app.post('/bookings/:id/terms-acceptance', wrap((req, me) => d.acceptBookingTerms(req.params.id, me)));
   app.post('/bookings/:id/payment', wrap((req, me) => d.startPayment(req.params.id, me)));
@@ -32,6 +31,7 @@ export function restApp() {
   app.post('/check-ins/verify', wrap(() => d.verifyBookingReference()));
   app.post('/check-ins', wrap(() => d.checkInBooking()));
 
+  app.use((req, res) => { res.status(404).json({ error: `no such operation: ${req.method} ${req.path}` }); });   // JSON, not the HTML default
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof d.DomainError) { res.status(err.status).json({ error: err.message, details: err.details }); return; }
     const grpcError = typeof err === 'object' && err !== null && 'code' in err;

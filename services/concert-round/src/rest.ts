@@ -30,13 +30,12 @@ export function restApp() {
   app.get('/rounds', wrap(() => d.getUpcomingRounds()));
   app.get('/rounds/:id', wrap((req) => d.getRound(req.params.id)));
   app.get('/rounds/:id/tables', wrap((req) => d.getRoundTables(req.params.id)));
-  app.get('/rounds/:id/preview', wrap((req) => d.previewRound(req.params.id)));
   app.put('/rounds/:id', wrap((req) => d.updateRound(req.params.id, req.body)));
-  app.put('/rounds/:id/published', wrap((req) => d.editPublishedRound(req.params.id, req.body)));
   app.post('/rounds/:id/validate', wrap((req) => d.validateRound(req.params.id)));
   app.post('/rounds/:id/publish', wrap((req) => d.publishRound(req.params.id)));
   app.delete('/rounds/:id', wrap((req) => d.discardDraftRound(req.params.id)));
 
+  app.use((req, res) => { res.status(404).json({ error: `no such operation: ${req.method} ${req.path}` }); });   // JSON, not the HTML default
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof d.DomainError) { res.status(err.status).json({ error: err.message, details: err.details }); return; }
     const grpcError = typeof err === 'object' && err !== null && 'code' in err;                    // a collaborator refused or is down

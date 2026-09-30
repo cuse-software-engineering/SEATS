@@ -164,17 +164,14 @@ function applyPatch(r: Round, patch: RoundPatch, fields: readonly RoundField[]) 
   }
 }
 
-export function updateRound(id: string, patch: RoundPatch): Round {                               // UC-03 steps 3–10, AF-1
+/** UC-03 steps 3–10, AF-1 (Draft: any field) and AF-3 (Published: only what BRULE-07 allows after the booking-open time). */
+export async function updateRound(id: string, patch: RoundPatch): Promise<Round & { confirmedBookings?: number }> {
   const r = requireRound(id);
-  if (r.status !== 'Draft') throw new DomainError(409, 'a Published round is changed with editPublishedRound()');
-  applyPatch(r, patch, ROUND_FIELDS);
-  r.checkInWindow = deriveCheckInWindow(r.startAt, getBusinessParameters());
-  return rounds.put(id, r);
-}
-
-export async function editPublishedRound(id: string, patch: RoundPatch): Promise<Round & { confirmedBookings: number }> {   // UC-03 AF-3 (BRULE-07, FR-35)
-  const r = requireRound(id);
-  if (r.status !== 'Published') throw new DomainError(409, 'the round is not Published');
+  if (r.status === 'Draft') {
+    applyPatch(r, patch, ROUND_FIELDS);
+    r.checkInWindow = deriveCheckInWindow(r.startAt, getBusinessParameters());
+    return rounds.put(id, r);
+  }
   const bookingOpen = !!r.bookingOpenAt && new Date(r.bookingOpenAt) <= now();
   const status = await tableAvailability.getRoundTableStatus(id);
   const booked = status.tables.filter((t) => ['BOOKED', 'OCCUPIED'].includes(t.status)).length;
@@ -223,11 +220,6 @@ export function validateRound(id: string): ValidationResult {                   
   return { valid: unique.length === 0, problems: unique };
 }
 
-export const previewRound = (id: string) => {                                                      // UC-03 step 13
-  const r = requireRound(id);
-  return { id: r.id, name: r.name, artist: r.artist, date: r.date, doorsOpenAt: r.doorsOpenAt, startAt: r.startAt, bookingOpenAt: r.bookingOpenAt, tables: tablesOf(r).filter((t) => t.forSale) };
-};
-
 export async function publishRound(id: string): Promise<Round> {                                  // UC-03 steps 14–15, EF-2 (idempotent)
   const r = requireRound(id);
   if (r.status === 'Published') return r;
@@ -264,7 +256,7 @@ export const getRound = (id: string): Round & { holdPeriodMinutes: number } => {
 };
 export const getRoundTables = (id: string): RoundTable[] => tablesOf(requireRound(id));           // UC-01 step 5 (FR-05)
 
-export function getRoundPricing(id: string) {                                                      // Booking: calculateTableFee()
+export function getRoundPricing(id: string) {                                                      // Booking: setPartySize() computes the fee from it
   const r = requireRound(id);
   return { roundId: id, prices: r.prices, extraPersonFee: (r.parameters ?? getBusinessParameters()).extraPersonFee };
 }

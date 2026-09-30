@@ -49,19 +49,18 @@ export async function setPartySize(id: string, customerId: string, { partySize }
   if (b.status !== 'Held') throw new DomainError(409, `the booking is ${b.status}`);
   if (!Number.isInteger(partySize) || (partySize as number) < 1) throw new DomainError(400, 'partySize must be a whole number of at least 1');
   b.partySize = partySize as number;
-  bookings.put(id, b);
-  return calculateTableFee(id, customerId);
+  await computeFee(b);                                                                                 // UC-01 step 11: the fee is part of the same request
+  return view(bookings.put(id, b));
 }
 
-export async function calculateTableFee(id: string, customerId: string): Promise<BookingView> {   // UC-01 step 11 (FR-09, BRULE-08, BRULE-09)
-  const b = requireOwnBooking(id, customerId);
+/** FR-09, BRULE-08, BRULE-09: package price of the table type in its zone plus the extra-person fee. Internal step of setPartySize(). */
+async function computeFee(b: Booking): Promise<void> {
   if (b.partySize === null) throw new DomainError(409, 'set the party size first');
   const pricing = await concertRound.getRoundPricing(b.roundId);
   const price = pricing.prices.find((p) => p.zoneId === b.zoneId && p.tableTypeId === b.tableTypeId);
   if (!price) throw new DomainError(409, 'the round has no package price for this table');
   const extraPersons = Math.max(0, b.partySize - b.capacity);
   b.fee = { packagePrice: price.packagePrice, extraPersons, extraPersonFee: pricing.extraPersonFee, fullTableFee: price.packagePrice + extraPersons * pricing.extraPersonFee };
-  return view(bookings.put(id, b));
 }
 
 // ---------------------------------------------------------------- UC-01 customer profile (FR-10, BRULE-11)
@@ -134,7 +133,7 @@ export async function cancelBooking(id: string, customerId: string): Promise<Boo
 export const getCustomerBookings = (customerId: string): BookingView[] => bookings.list().filter((b) => b.customerId === customerId).map(view);   // FR-40
 export const getRoundBookings = (roundId: string): Booking[] => bookings.list().filter((b) => b.roundId === roundId);                               // FR-42 live view
 
-// ---------------------------------------------------------------- Time: hold expiry (UC-01 EF-1, FR-23, ADR-08)
+// ---------------------------------------------------------------- Time: hold expiry (UC-01 EF-1, FR-23, ADR-08). A job on the service's own timer, not an operation.
 export async function expireUnpaidBookings(now = Date.now()): Promise<string[]> {
   const expired: string[] = [];
   for (const b of bookings.list().filter((b) => b.status === 'Held' && new Date(b.holdEndsAt).getTime() <= now)) {
@@ -148,8 +147,7 @@ export async function expireUnpaidBookings(now = Date.now()): Promise<string[]> 
   return expired;
 }
 
-// ---------------------------------------------------------------- progress 2
-export const issueETicket = (): never => notImplemented('issueETicket()');
+// ---------------------------------------------------------------- progress 2 (the e-ticket is issued inside confirmBookingPayment())
 export const getETicket = (): never => notImplemented('getETicket()');
 export const verifyBookingReference = (): never => notImplemented('verifyBookingReference()');
 export const checkInBooking = (): never => notImplemented('checkInBooking()');

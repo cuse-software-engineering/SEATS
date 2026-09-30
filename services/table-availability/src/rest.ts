@@ -10,6 +10,7 @@ export function restApp() {
     if (req.get('if-none-match') === String(status.version)) { res.status(304).end(); return; }   // unchanged map costs nothing
     res.set('ETag', String(status.version)).json(status);
   });
+  app.use((req, res) => { res.status(404).json({ error: `no such operation: ${req.method} ${req.path}` }); });   // JSON, not the HTML default
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const status = err instanceof domain.DomainError ? err.status : 500;
     res.status(status).json({ error: err instanceof Error ? err.message : String(err) });

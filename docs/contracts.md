@@ -27,14 +27,12 @@ Every REST call goes through the API Gateway, which strips `/api` and forwards t
 | activateZoneMap() | `POST /zone-maps/:id/activate` | validates first; idempotent |
 | discardDraftZoneMap() | `DELETE /zone-maps/:id` | Draft only (the D of CRUD) |
 | defineTableType() | `PUT /table-types/:id` `{name, capacity, packageContent}` | venue table types |
-| — | `GET /table-types` | |
+| listTableTypes() | `GET /table-types` | |
 | getBusinessParameters() | `GET /business-parameters` | |
 | updateBusinessParameters() | `PUT /business-parameters` | hold period, check-in window, grace period, extra-person fee |
 | createRound() | `POST /rounds` `{name?}` | new Draft round |
-| updateRound() | `PUT /rounds/:id` | Draft only; derives the check-in window |
-| editPublishedRound() | `PUT /rounds/:id/published` | AF-3 rules (BRULE-07) |
+| updateRound() | `PUT /rounds/:id` | Draft: any field, derives the check-in window; Published: only what AF-3 allows (BRULE-07) |
 | validateRound() | `POST /rounds/:id/validate` | UC-03 S-1 |
-| previewRound() | `GET /rounds/:id/preview` | as the Customer sees it |
 | publishRound() | `POST /rounds/:id/publish` | snapshots the parameters; gRPC InitializeRoundTableStatus |
 | discardDraftRound() | `DELETE /rounds/:id` | Draft only |
 | getUpcomingRounds() | `GET /rounds` | status not yet open / open / sold out (gRPC CountAvailableTables) |
@@ -65,8 +63,7 @@ Status values: `AVAILABLE`, `HELD`, `BOOKED`, `OCCUPIED`, `NOT_FOR_SALE`. `HoldT
 |---|---|---|
 | createHeldBooking() | `POST /bookings` `{roundId, tableNumber}` | gRPC GetRound, HoldTable; 409 when just taken (AF-3) |
 | getBooking() | `GET /bookings/:id` | own bookings only |
-| setPartySize() | `PUT /bookings/:id/party-size` `{partySize}` | then calculateTableFee() |
-| calculateTableFee() | `GET /bookings/:id/fee` | gRPC GetRoundPricing (BRULE-08, BRULE-09) |
+| setPartySize() | `PUT /bookings/:id/party-size` `{partySize}` | computes the fee in the same request: gRPC GetRoundPricing (BRULE-08, BRULE-09) |
 | getCustomerProfile() | `GET /customers/me` | 404 on the first booking |
 | createCustomerProfile() | `POST /customers/me` `{name, phone, consent}` | FR-10; AF-7 validation |
 | updateCustomerProfile() | `PUT /customers/me` | |
@@ -76,7 +73,7 @@ Status values: `AVAILABLE`, `HELD`, `BOOKED`, `OCCUPIED`, `NOT_FOR_SALE`. `HoldT
 | cancelBooking() | `POST /bookings/:id/cancel` | gRPC ReleaseHold |
 | getCustomerBookings() | `GET /customers/me/bookings` | My Bookings |
 | getRoundBookings() | `GET /rounds/:id/bookings` | live view (manager, owner) |
-| expireUnpaidBookings() | internal job every 5 s | gRPC ReleaseHold; hold-expired notice is a log line for now |
-| verifyBookingReference(), checkInBooking(), issueETicket(), getETicket() | `501` | progress 2 |
+| verifyBookingReference(), checkInBooking(), getETicket() | `501` | progress 2; the e-ticket is issued inside confirmBookingPayment() |
+| hold-expiry job | not an operation: every 5 s | gRPC ReleaseHold; the hold-expired notice is a log line for now |
 
 Errors: JSON `{error: "…"}` with 400 (invalid input), 403 (role), 404, 409 (rule broken, e.g. table just taken), 501.
