@@ -96,3 +96,12 @@ test('staff sign-in, staff accounts and the payment webhook', async () => {
   const health = await call(H('', ''), 'GET', '/health');
   assert.equal(health.json.ok, true); assert.equal(health.json.services.length, 6);
 });
+
+test('a LINE ID token identifies the customer at the gateway (the LINE Login Adapter, ADR-01)', async () => {
+  const bearer = (token: string) => ({ authorization: `Bearer ${token}`, 'content-type': 'application/json' });
+  assert.equal((await call(bearer('fake-line-U-somchai'), 'GET', '/api/rounds')).status, 200);
+  const me = await call(bearer('fake-line-U-somchai'), 'GET', '/api/customers/me');
+  assert.equal(me.json.name, 'Somchai', 'the token maps to the same customer as the header did');
+  assert.equal((await call(bearer('nonsense'), 'GET', '/api/rounds')).status, 401);
+  assert.equal((await call(bearer('fake-line-U-somchai'), 'POST', `/api/rounds/${roundId}/publish`)).status, 403, 'a LINE user is a customer, never staff');
+});

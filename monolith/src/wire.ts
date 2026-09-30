@@ -12,6 +12,7 @@ import { api as notificationApi, toServiceError as notificationError } from '@se
 import { api as staffApi, toServiceError as staffError } from '@seats/staff-account/src/api.js';
 import { seedStaffAccounts } from '@seats/staff-account/src/domain.js';
 import { expireUnpaidBookings } from '@seats/booking/src/domain.js';
+import { retryFailedMessages } from '@seats/notification/src/domain.js';
 import { inProcess, serviceDefinition } from './inprocess.js';
 
 /** Rewires every client to in-process calls. Call it before the gateway's route table loads (it binds the client methods). */
@@ -54,10 +55,12 @@ export function wireMonolith(): void {
   seedStaffAccounts();
 }
 
-/** The hold-expiry job of the Booking Service (ADR-08), which its own process runs on a timer. */
-export function startJobs(): NodeJS.Timeout {
-  const every = Number(process.env.EXPIRY_JOB_MS ?? 5000);
-  return setInterval(() => { expireUnpaidBookings().catch((e: Error) => console.error('[booking] expiry job failed:', e.message)); }, every).unref();
+/** The jobs the service processes run on their own timers: the hold expiry of the Booking Service (ADR-08) and the retry of the Notification Service (FR-22). */
+export function startJobs(): NodeJS.Timeout[] {
+  return [
+    setInterval(() => { expireUnpaidBookings().catch((e: Error) => console.error('[booking] expiry job failed:', e.message)); }, Number(process.env.EXPIRY_JOB_MS ?? 5000)).unref(),
+    setInterval(() => { retryFailedMessages().catch((e: Error) => console.error('[notification] retry job failed:', e.message)); }, Number(process.env.NOTIFICATION_RETRY_MS ?? 100_000)).unref(),
+  ];
 }
 
 import type grpc from '@grpc/grpc-js';

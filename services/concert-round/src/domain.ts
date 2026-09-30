@@ -1,11 +1,12 @@
 // Concert Round Service — the operations of Table 5.3 (MVP), one function each. No transport code here.
 import { randomUUID } from 'node:crypto';
 import { collection } from './store.js';
+import { adapters } from './adapters.js';
 import { tableAvailability } from './clients.js';
 import type { BusinessParameters, CheckInWindow, PackagePrice, Round, RoundTable, TableType, UpcomingRound, ValidationResult, Zone, ZoneMap, ZoneMapTable } from './model.js';
 
 export class DomainError extends Error {
-  constructor(public readonly status: 400 | 404 | 409, message: string, public readonly details?: unknown) { super(message); }
+  constructor(public readonly status: 400 | 404 | 409 | 503, message: string, public readonly details?: unknown) { super(message); }
 }
 
 const zoneMaps = collection<ZoneMap>('zoneMaps');
@@ -57,10 +58,16 @@ export function createZoneMap({ name }: { name?: string } = {}): ZoneMap {      
   return zoneMaps.put(map.id, map);
 }
 
-export function uploadZoneMapImage(id: string, { fileName }: { fileName?: string }): ZoneMap {     // UC-04 step 3, EF-3
+export async function uploadZoneMapImage(id: string, { fileName }: { fileName?: string }): Promise<ZoneMap> {   // UC-04 step 3, EF-3
   const map = requireZoneMap(id);
   if (!fileName) throw new DomainError(400, 'fileName is required');
-  map.imageUrl = `https://storage.example/zone-maps/${id}/${fileName}`;                           // Media Storage Adapter stub (storeZoneMapImage)
+  let url: string;
+  try {
+    ({ url } = await adapters.mediaStorage.store(id, fileName));                                   // the Media Storage Adapter (FR-39)
+  } catch (e) {                                                                                    // EF-3: the map keeps its old image
+    throw new DomainError(503, 'the image of the venue could not be stored; the zone map is unchanged', { external: 'Media Storage', reason: e instanceof Error ? e.message : String(e) });
+  }
+  map.imageUrl = url;
   return zoneMaps.put(id, map);
 }
 

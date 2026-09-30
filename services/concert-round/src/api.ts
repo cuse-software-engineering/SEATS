@@ -7,7 +7,7 @@ import type { Round } from '@seats/proto/gen/seats/concertround/v1/Round';
 import type { Round as RoundRecord } from './model.js';
 import * as d from './domain.js';
 
-const CODES: Record<number, grpc.status> = { 400: grpc.status.INVALID_ARGUMENT, 404: grpc.status.NOT_FOUND, 409: grpc.status.FAILED_PRECONDITION, 501: grpc.status.UNIMPLEMENTED };
+const CODES: Record<number, grpc.status> = { 400: grpc.status.INVALID_ARGUMENT, 404: grpc.status.NOT_FOUND, 409: grpc.status.FAILED_PRECONDITION, 501: grpc.status.UNIMPLEMENTED, 503: grpc.status.UNAVAILABLE };
 
 /** A DomainError as the gRPC status the caller sees; a failing collaborator is UNAVAILABLE. */
 export function toServiceError(e: unknown): grpc.ServiceError {

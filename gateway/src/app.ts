@@ -5,6 +5,7 @@
 import express, { type Request, type Response } from 'express';
 import grpc from '@grpc/grpc-js';
 import { DEADLINE_MS, healthOf } from './clients.js';
+import { adapters } from './adapters.js';
 import { ROUTES, type Role, type Route } from './routes.js';
 
 const HTTP_STATUS: Partial<Record<grpc.status, number>> = {
@@ -26,11 +27,20 @@ function mountHealth(app: express.Express): void {
   });
 }
 
-const handle = (route: Route) => async (req: Request, res: Response) => {
+/** Who calls: the progress-1 headers x-user-id and x-role, or a LINE ID token as `Authorization: Bearer` verified by the LINE Login Adapter (a customer). */
+async function identify(req: Request): Promise<{ userId: string; role: Role | '' }> {
   const userId = req.get('x-user-id') ?? '';
   const role = (req.get('x-role') ?? '') as Role | '';
+  if (userId && role) return { userId, role };
+  const token = /^Bearer\s+(.+)$/i.exec(req.get('authorization') ?? '')?.[1];
+  const line = token ? await adapters.lineLogin.verifyIdToken(token) : null;
+  return line ? { userId: line.userId, role: 'customer' } : { userId: '', role: '' };
+}
+
+const handle = (route: Route) => async (req: Request, res: Response) => {
+  const { userId, role } = await identify(req);
   if (route.auth !== 'none') {
-    if (!userId || !role) { res.status(401).json({ error: 'x-user-id and x-role headers are required (fake auth, progress 1)' }); return; }
+    if (!userId || !role) { res.status(401).json({ error: 'no identity: send a LINE ID token as Authorization: Bearer, or the headers x-user-id and x-role (fake auth, progress 1)' }); return; }
     if (!route.roles.includes(role)) { res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
   }
   const metadata = new grpc.Metadata();
@@ -51,7 +61,8 @@ const handle = (route: Route) => async (req: Request, res: Response) => {
     const raw = err.metadata?.get('error-details-bin')[0];
     const details = raw ? JSON.parse(raw.toString()) : undefined;
     log(req, route, status, started, role, userId, err.code === grpc.status.UNAVAILABLE ? err.message : undefined);
-    res.status(status).json({ error: status === 502 ? `the service behind ${req.path} is not reachable` : err.details ?? err.message, ...(details !== undefined ? { details } : {}) });
+    const unreachable = status === 502 && details === undefined;   // a connection failure; an UNAVAILABLE with details is the service's own answer (an external system refused)
+    res.status(status).json({ error: unreachable ? `the service behind ${req.path} is not reachable` : err.details ?? err.message, ...(details !== undefined ? { details } : {}) });
   }
 };
 

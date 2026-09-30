@@ -6,7 +6,9 @@ export interface Message {
   customerId: string;       // LINE user id (BRULE-12)
   bookingId: string;        // reference to the Booking DB
   kind: NotificationKind;
-  text: string;             // what the LINE Messaging Adapter would push
+  text: string;             // what the LINE Messaging Adapter pushes
   delivered: boolean;
-  sentAt: string;
+  attempts: number;         // pushes tried; the retry job stops at 3 (FR-22)
+  lastError: string;        // '' when the last push succeeded
+  sentAt: string;           // the first attempt
 }

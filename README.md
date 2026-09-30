@@ -93,20 +93,36 @@ TypeScript throughout (ES modules, `strict`), the same layout in every service:
 | `src/api.ts` | the API layer: one function per gRPC method, request message in, response message out |
 | `src/grpc.ts` | the gRPC server over the API layer, plus `grpc.health.v1.Health` |
 | `src/clients.ts` | the gRPC clients of the services it calls, each call with a deadline |
+| `src/adapters.ts` | the ports to the external systems it uses, with their fakes (where the service has one) |
 | `test/` | unit tests of the domain with the clients stubbed |
 
 Every service serves the standard health check; the gateway's `GET /health` calls each of them.
 
+## External systems: adapters and their fakes
+
+The LINE Platform, the Payment Gateway and the object storage are reached only through an adapter, a module of the
+component that uses it (project document, Table 5.2). Each adapter is a port with a fake behind it in progress 1; the
+real implementation replaces the fake by configuration, and the tests inject their own doubles through the same port.
+
+| Port | Where | Fake (default) | Selected by |
+|---|---|---|---|
+| LINE Login: verify an ID token | `gateway/src/adapters.ts` | accepts `Authorization: Bearer fake-line-<LINE user id>` | `LINE_LOGIN=fake` |
+| LINE Messaging: push a message | `services/notification/src/adapters.ts` | logs the push and records it; a test can make the next pushes fail, which the retry job of FR-22 then retries three times | `LINE_MESSAGING=fake` |
+| Payment Gateway: open a checkout, verify a result's signature | `services/payment/src/adapters.ts` | the simulated gateway of ADR-11: a fake checkout URL, the signature `sim-<payment id>` | `PAYMENT_GATEWAY=simulated` |
+| Media Storage: store the image of a zone map | `services/concert-round/src/adapters.ts` | answers a URL without storing; a test can make the next store fail (UC-04 EF-3) | `MEDIA_STORAGE=fake` |
+
+The gateway therefore accepts two identities: the progress-1 headers `x-user-id` and `x-role` (staff, and the web
+apps for now) or a LINE ID token as `Authorization: Bearer …`, verified by the LINE Login Adapter, which makes the
+caller a customer.
+
 ## Progress 1 stubs
 
-- **Auth**: the gateway trusts the headers `x-user-id` and `x-role` (`customer`, `manager`, `front_staff`, `owner`)
-  and passes them to the services as gRPC metadata. LINE Login (ADR-01) comes later. Staff can already sign in at the
-  Staff Account Service (`POST /api/sessions`), which seeds `manager/manager`, `door1/door1` and `owner/owner`; the
-  staff routes do not check the token yet.
+- **Auth**: the web apps still send the headers `x-user-id` and `x-role` (`customer`, `manager`, `front_staff`,
+  `owner`); the LIFF app will send the LINE ID token instead. Staff can already sign in at the Staff Account Service
+  (`POST /api/sessions`), which seeds `manager/manager`, `door1/door1` and `owner/owner`; the staff routes do not check
+  the session token yet.
 - **Storage**: every service keeps its data in memory behind `src/store.ts`.
-- **Payment**: the Payment Service is the simulated Payment Gateway (ADR-11): the checkout URL is fake and the result
-  is posted to `POST /api/payments/webhook` with the signature `sim-<payment_id>`. The Booking Service's
-  `startPayment()` still answers 501; wiring it comes in progress 2.
-- **Notifications**: the Notification Service records each notice and logs it instead of calling the LINE Messaging
-  API; the Booking Service does not call it yet.
-- **Not built yet**: check-in (501), media upload (the adapter returns a URL).
+- **Payment**: the Booking Service's `startPayment()` still answers 501; wiring it to the Payment Service comes in
+  progress 2. The simulated gateway's result is posted to `POST /api/payments/webhook`.
+- **Notifications**: the Booking Service does not call the Notification Service yet.
+- **Not built yet**: check-in (501).

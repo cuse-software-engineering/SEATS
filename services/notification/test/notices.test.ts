@@ -1,39 +1,61 @@
-// Unit tests of the Notification Service domain: the LINE Messaging Adapter stub records and logs each notice.
+// Unit tests of the Notification Service domain: the LINE Messaging API behind its adapter (ADR-10), the fake that
+// records each push, and the retry job of FR-22.
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as d from '../src/domain.js';
+import { adapters, LoggingLineMessaging } from '../src/adapters.js';
 import { collection, resetStore } from '../src/store.js';
 import type { Message } from '../src/model.js';
 
-const refused = (fn: () => unknown, status: number) => assert.throws(fn, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const rejected = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
 const REQUEST = { customerId: 'U-somchai', bookingId: 'b1', roundName: 'Friday Live', tableNumber: 5 };
 const messages = collection<Message>('messages');
-let logged: string[] = [];
-const realLog = console.log;
+let line: LoggingLineMessaging;
+const quiet = <T>(fn: () => Promise<T>): Promise<T> => { const log = console.log, warn = console.warn; console.log = () => {}; console.warn = () => {}; return fn().finally(() => { console.log = log; console.warn = warn; }); };
 
-beforeEach(() => { resetStore(); logged = []; console.log = (line: string) => { logged.push(line); }; });
-const restore = () => { console.log = realLog; };
+beforeEach(() => { resetStore(); line = new LoggingLineMessaging(); adapters.lineMessaging = line; });
 
 describe('the three notices', () => {
-  test('each records the message, logs one LINE push line and answers delivered', () => {
-    try {
-      const senders = [['BookingConfirmation', d.sendBookingConfirmation], ['HoldExpiredNotice', d.sendHoldExpiredNotice], ['PaymentFailedNotice', d.sendPaymentFailedNotice]] as const;
-      for (const [kind, send] of senders) {
-        const r = send(REQUEST);
-        assert.equal(r.delivered, true);
-        const m = messages.get(r.messageId);
-        assert.deepEqual([m?.kind, m?.customerId, m?.bookingId], [kind, 'U-somchai', 'b1']);
-        assert.ok(m?.text.includes('table 5') && m.text.includes('Friday Live'), m?.text);
-      }
-      assert.deepEqual(logged, ['[notification] LINE push to U-somchai: BookingConfirmation', '[notification] LINE push to U-somchai: HoldExpiredNotice', '[notification] LINE push to U-somchai: PaymentFailedNotice']);
-      assert.equal(messages.list().length, 3);
-    } finally { restore(); }
-  });
-  test('a notice needs the customer and the booking', () => {
-    try {
-      refused(() => d.sendBookingConfirmation({ ...REQUEST, customerId: '' }), 400);
-      refused(() => d.sendHoldExpiredNotice({ ...REQUEST, bookingId: undefined }), 400);
-      assert.deepEqual([logged, messages.list()], [[], []]);
-    } finally { restore(); }
-  });
+  test('each pushes one message through the adapter, records it and answers delivered', () => quiet(async () => {
+    const senders = [['BookingConfirmation', d.sendBookingConfirmation], ['HoldExpiredNotice', d.sendHoldExpiredNotice], ['PaymentFailedNotice', d.sendPaymentFailedNotice]] as const;
+    for (const [kind, send] of senders) {
+      const r = await send(REQUEST);
+      assert.equal(r.delivered, true);
+      const m = messages.get(r.messageId);
+      assert.deepEqual([m?.kind, m?.customerId, m?.bookingId, m?.attempts, m?.lastError], [kind, 'U-somchai', 'b1', 1, '']);
+      assert.ok(m?.text.includes('table 5') && m.text.includes('Friday Live'), m?.text);
+    }
+    assert.deepEqual(line.pushed.map((p) => [p.userId, p.kind]), [['U-somchai', 'BookingConfirmation'], ['U-somchai', 'HoldExpiredNotice'], ['U-somchai', 'PaymentFailedNotice']]);
+  }));
+  test('a notice needs the customer and the booking', () => quiet(async () => {
+    await rejected(d.sendBookingConfirmation({ ...REQUEST, customerId: '' }), 400);
+    await rejected(d.sendHoldExpiredNotice({ ...REQUEST, bookingId: undefined }), 400);
+    assert.deepEqual([line.pushed, messages.list()], [[], []]);
+  }));
+});
+
+describe('when the LINE Messaging API refuses the message (UC-01 EF-3, FR-22)', () => {
+  test('the notice is recorded as not delivered and the caller learns it', () => quiet(async () => {
+    line.failNext = 1;
+    const r = await d.sendBookingConfirmation(REQUEST);
+    assert.equal(r.delivered, false);
+    const m = d.getMessage(r.messageId);
+    assert.equal(m?.attempts, 1); assert.match(m?.lastError ?? '', /did not accept/);
+  }));
+  test('the retry job resends it and stops once delivered', () => quiet(async () => {
+    line.failNext = 1;
+    const r = await d.sendHoldExpiredNotice(REQUEST);
+    assert.deepEqual(await d.retryFailedMessages(), [r.messageId]);
+    assert.equal(d.getMessage(r.messageId)?.delivered, true);
+    assert.equal(d.getMessage(r.messageId)?.attempts, 2);
+    assert.deepEqual(await d.retryFailedMessages(), [], 'nothing left to retry');
+  }));
+  test('the retry job gives up after three attempts', () => quiet(async () => {
+    line.failNext = 10;
+    const r = await d.sendPaymentFailedNotice(REQUEST);
+    await d.retryFailedMessages(); await d.retryFailedMessages();
+    assert.deepEqual(await d.retryFailedMessages(), [], 'the fourth push is never tried');
+    assert.deepEqual([d.getMessage(r.messageId)?.delivered, d.getMessage(r.messageId)?.attempts], [false, 3]);
+    assert.equal(line.pushed.length, 0);
+  }));
 });

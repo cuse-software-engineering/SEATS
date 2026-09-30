@@ -2,6 +2,7 @@
 // driven through the routes the Back-office Web App calls (Appendix D, screens B5 and B6).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { adapters as mediaAdapters, type FakeMediaStorage } from '@seats/concert-round/src/adapters.js';
 import { activeZoneMap, call, customer, defineTableTypes, futureDay, heldBooking, manager, PRICES, publishedRound, schedule, TABLES } from './harness.js';
 
 test('UC-04 basic flow Create Venue Zone Map', async () => {
@@ -137,4 +138,13 @@ test('UC-04 EF-1 Validation Fails', async () => {
 });
 
 test.todo('UC-04 EF-2 Zone Map Cannot Be Saved: the in-memory store cannot fail (the retry that finds the Active map is asserted in the basic flow)');
-test.todo('UC-04 EF-3 Zone Map Image Cannot Be Uploaded: the Media Storage Adapter is a stub that always answers a URL and cannot fail');
+test('UC-04 EF-3 Zone Map Image Cannot Be Uploaded', async () => {
+  const id = (await call(manager, 'POST', '/api/zone-maps', { name: 'Garden stage' })).json.id;
+  (mediaAdapters.mediaStorage as FakeMediaStorage).failNext = 1;                       // the object storage refuses the next image
+  const failed = await call(manager, 'POST', `/api/zone-maps/${id}/image`, { fileName: 'garden.png' });
+  assert.equal(failed.status, 502); assert.match(failed.json.error, /could not be stored; the zone map is unchanged/);
+  assert.equal(failed.json.details.external, 'Media Storage');
+  assert.equal((await call(manager, 'GET', `/api/zone-maps/${id}`)).json.imageUrl, '', 'step 3 is repeated later; the map keeps its state');
+  const ok = await call(manager, 'POST', `/api/zone-maps/${id}/image`, { fileName: 'garden.png' });
+  assert.equal(ok.status, 200); assert.match(ok.json.imageUrl, /garden\.png$/);
+});

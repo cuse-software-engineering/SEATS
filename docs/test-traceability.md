@@ -43,7 +43,7 @@ the flow id and the flow's title, for example `UC-01 AF-3 Table Just Taken by An
 | UC-04 Create Venue Zone Map | AF-3 Save as Draft | `uc-04.test.ts` | — | covered |
 | UC-04 Create Venue Zone Map | EF-1 Validation Fails | `uc-04.test.ts` | `uc-04.spec.ts` | covered |
 | UC-04 Create Venue Zone Map | EF-2 Zone Map Cannot Be Saved | `uc-04.test.ts` (todo: the in-memory store cannot fail (the retry that finds the Active map is asserted in the basic flow)) | — | todo |
-| UC-04 Create Venue Zone Map | EF-3 Zone Map Image Cannot Be Uploaded | `uc-04.test.ts` (todo: the Media Storage Adapter is a stub that always answers a URL and cannot fail) | — | todo |
+| UC-04 Create Venue Zone Map | EF-3 Zone Map Image Cannot Be Uploaded | `uc-04.test.ts` | — | covered |
 | UC-09 Maintain Customer Profile | basic flow Maintain Customer Profile | `uc-09.test.ts` | — | covered |
 | UC-09 Maintain Customer Profile | AF-1 Consent Refused | `uc-09.test.ts` | `uc-09.spec.ts` | covered |
 | UC-09 Maintain Customer Profile | AF-2 Invalid Profile Data | `uc-09.test.ts` | `uc-09.spec.ts` | covered |
@@ -52,7 +52,7 @@ the flow id and the flow's title, for example `UC-01 AF-3 Table Just Taken by An
 | UC-10 Pay the Full Table Fee | AF-1 Payment Declined | `uc-10.test.ts` (todo: payment is progress 2 (no payment request can be created, so the simulated gateway has nothing to decline)) | — | todo |
 | UC-10 Pay the Full Table Fee | EF-4 Hold Expires During Payment | `uc-10.test.ts` (todo: payment is progress 2 (the expiry itself is UC-01 EF-1, asserted in uc-01.test.ts)) | — | todo |
 
-**Summary**: 39 scenarios: 21 covered, 18 todo, 0 missing. Per use case (covered / todo / missing): UC-01 8 / 2 / 0, UC-02 0 / 9 / 0, UC-03 5 / 1 / 0, UC-04 5 / 2 / 0, UC-09 3 / 1 / 0, UC-10 0 / 3 / 0. Frontend tests found: 11.
+**Summary**: 39 scenarios: 22 covered, 17 todo, 0 missing. Per use case (covered / todo / missing): UC-01 8 / 2 / 0, UC-02 0 / 9 / 0, UC-03 5 / 1 / 0, UC-04 6 / 1 / 0, UC-09 3 / 1 / 0, UC-10 0 / 3 / 0. Frontend tests found: 11.
 
 Other tests named after a use case without a scenario id (progress 1 contract checks): `uc-02.test.ts` "UC-02 (progress 1) the check-in routes answer 501 and keep their role check"; `uc-10.test.ts` "UC-10 (progress 1) startPayment() needs the party size, the fee and the accepted terms, then answers 501"; `uc-08.spec.ts` "UC-08 Sign in and sign out".
 
