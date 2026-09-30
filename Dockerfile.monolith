@@ -1,0 +1,23 @@
+# The backend as ONE process (monolith mode, ADR-14) for a process host such as Render: the gateway's REST API and
+# the six services in memory. Not the microservices deployment, which is docker-compose.yml.
+#   docker build -f Dockerfile.monolith -t seats-monolith . && docker run -p 4000:4000 seats-monolith
+FROM node:22-alpine
+WORKDIR /app
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY proto/package.json proto/
+COPY gateway/package.json gateway/
+COPY monolith/package.json monolith/
+COPY services/concert-round/package.json services/concert-round/
+COPY services/table-availability/package.json services/table-availability/
+COPY services/booking/package.json services/booking/
+COPY services/payment/package.json services/payment/
+COPY services/notification/package.json services/notification/
+COPY services/staff-account/package.json services/staff-account/
+RUN npm install --no-audit --no-fund   # with the dev dependencies: tsx runs the TypeScript sources
+ENV NODE_ENV=production
+COPY proto ./proto
+COPY gateway ./gateway
+COPY monolith ./monolith
+COPY services ./services
+EXPOSE 4000
+CMD ["./node_modules/.bin/tsx", "monolith/src/server.ts"]

@@ -1,0 +1,16 @@
+# Render blueprint: the backend as one process (monolith mode, ADR-14) on the free plan. New -> Blueprint -> this repo.
+# The free plan sleeps after 15 minutes without traffic and keeps the data in memory: fine for the demo, not for
+# production. The web apps on Vercel rewrite /api to this service (frontend/*/vercel.json).
+services:
+  - type: web
+    name: seats-monolith
+    runtime: docker
+    dockerfilePath: ./Dockerfile.monolith
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: EXPIRY_JOB_MS
+        value: "5000"

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "cd ../.. && npm install --no-audit --no-fund",
+  "buildCommand": "cd ../.. && npm run build -w frontend/shared -w frontend/customer-web-app",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://seats-monolith.onrender.com/api/:path*" },
+    { "source": "/health", "destination": "https://seats-monolith.onrender.com/health" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -81,6 +81,26 @@ drive each basic, alternative and exception flow of the use cases through the ga
 named by the flow they cover (`UC-01 AF-3 Table Just Taken by Another Customer`). The Playwright suite
 (`frontend/e2e/`) does the same through the screens. The smoke test is the one check that runs over the network.
 
+## Deploy
+
+The demo deployment is the monolith on a process host and the two web apps on Vercel; the microservices themselves are
+deployed with `docker-compose.yml`.
+
+**Backend on Render** (free plan): New → Blueprint → this repository. `render.yaml` creates the web service
+`seats-monolith` from `Dockerfile.monolith`, which runs `monolith/src/server.ts` on the port Render gives it, with
+`/health` as the health check. Its URL is `https://seats-monolith.onrender.com`; if Render has to change the name, put
+the new host into the two `vercel.json` files below. The free plan sleeps after 15 minutes without traffic (the first
+request then takes up to a minute) and keeps the data in memory, so it starts empty after every sleep: seed it with
+`GATEWAY=https://seats-monolith.onrender.com npm run smoke` or through the back-office.
+
+**Web apps on Vercel** (Hobby plan): import this repository twice, once with the root directory
+`frontend/customer-web-app` and once with `frontend/back-office-web-app`. Each folder's `vercel.json` sets the
+install and build commands (they run from the repository root, so the shared client builds too), the output
+directory and the rewrites: `/api/*` and `/health` go to the Render backend, so the apps stay same-origin and need no
+CORS, and every other path serves `index.html` for the client-side routes. No environment variable is needed. After
+the first deploy, `https://<app>.vercel.app/health` must answer the backend's health JSON; the customer app's URL is
+the one to register as the LIFF endpoint later (ADR-01).
+
 ## Inside a service
 
 TypeScript throughout (ES modules, `strict`), the same layout in every service:
