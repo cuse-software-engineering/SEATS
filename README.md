@@ -9,6 +9,9 @@ This repository implements the microservice design of the project document of gr
 Architecture): the same names, contracts and decisions, so that the document and the code can be read side by side.
 Who builds what and how we work is in [docs/team.md](docs/team.md).
 
+The project document's repository includes this repository as a git submodule at `assignments/group/code`, pinned to the
+commit that each document version describes; a tagged document version pairs with the commit its pointer names.
+
 ## Architecture
 
 Three parts: the **Frontend** (two web apps), the **Backend** (an API Gateway and six services, each with its own
