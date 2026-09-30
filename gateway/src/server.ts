@@ -1,43 +1,62 @@
-// API Gateway: fake auth (progress 1), role check per route, forward to the owning service with the identity headers.
-import express from 'express';
-import { ROUTES, type Role } from './routes.js';
+// API Gateway: the only REST API of SEATS (ADR-12). Fake auth (progress 1), role check per route (FR-66), then one
+// gRPC call to the owning service: path, query and JSON body in, JSON out, gRPC status mapped to an HTTP status.
+import express, { type Request, type Response } from 'express';
+import grpc from '@grpc/grpc-js';
+import { DEADLINE_MS, healthOf } from './clients.js';
+import { ROUTES, type Role, type Route } from './routes.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const app = express();
-app.use(express.raw({ type: '*/*', limit: '2mb' }));   // forward the body as received
+app.use(express.json({ limit: '2mb' }));
+
+const HTTP_STATUS: Partial<Record<grpc.status, number>> = {
+  [grpc.status.INVALID_ARGUMENT]: 400, [grpc.status.UNAUTHENTICATED]: 401, [grpc.status.PERMISSION_DENIED]: 403, [grpc.status.NOT_FOUND]: 404,
+  [grpc.status.ALREADY_EXISTS]: 409, [grpc.status.FAILED_PRECONDITION]: 409, [grpc.status.ABORTED]: 409, [grpc.status.UNIMPLEMENTED]: 501,
+  [grpc.status.UNAVAILABLE]: 502, [grpc.status.DEADLINE_EXCEEDED]: 504,
+};
+
+const unary = <Res>(run: (cb: grpc.requestCallback<Res>) => void) =>
+  new Promise<Res>((resolve, reject) => run((err, res) => (err ? reject(err) : resolve(res as Res))));
 
 app.get('/health', async (_req, res) => {
-  const targets = [...new Set(ROUTES.map((r) => r.target))];
-  const status = await Promise.all(targets.map((t) => fetch(`${t}/health`).then((r) => r.json() as Promise<{ service: string; ok: boolean }>).catch(() => ({ target: t, ok: false }))));
-  res.json({ service: 'gateway', ok: status.every((s) => s.ok), services: status });
+  const services = await Promise.all(Object.entries(healthOf).map(async ([service, client]) => {
+    const ok = await unary<{ status: number }>((cb) => client.check({}, { deadline: Date.now() + DEADLINE_MS }, cb)).then((r) => r.status === 1).catch(() => false);
+    return { service, ok };
+  }));
+  res.json({ service: 'gateway', ok: services.every((s) => s.ok), services });
 });
 
-app.use(async (req, res) => {
-  const route = ROUTES.find((r) => r.match.test(req.path));
-  if (!route) { res.status(404).json({ error: `no route for ${req.path}` }); return; }
+const handle = (route: Route) => async (req: Request, res: Response) => {
   const userId = req.get('x-user-id');
   const role = req.get('x-role') as Role | undefined;
   if (!userId || !role) { res.status(401).json({ error: 'x-user-id and x-role headers are required (fake auth, progress 1)' }); return; }
-  const allowed = req.method === 'GET' ? route.read : route.write;
-  if (!allowed.includes(role)) { res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
-  const url = route.target + req.originalUrl.replace(/^\/api/, '');
+  if (!route.roles.includes(role)) { res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
+  const metadata = new grpc.Metadata();
+  metadata.set('x-user-id', userId);
+  metadata.set('x-role', role);
   const started = Date.now();
   try {
-    const body = req.body as Buffer | undefined;
-    const ifNoneMatch = req.get('if-none-match');
-    const upstream = await fetch(url, {
-      method: req.method,
-      headers: { 'content-type': req.get('content-type') ?? 'application/json', 'x-user-id': userId, 'x-role': role, ...(ifNoneMatch ? { 'if-none-match': ifNoneMatch } : {}) },
-      body: ['GET', 'HEAD'].includes(req.method) || !body?.length ? undefined : new Uint8Array(body),
-    });
-    const payload = Buffer.from(await upstream.arrayBuffer());
-    console.log(`[gateway] ${role}:${userId} ${req.method} ${req.originalUrl} -> ${url} ${upstream.status} (${Date.now() - started} ms)`);
-    for (const h of ['content-type', 'etag']) { const v = upstream.headers.get(h); if (v) res.set(h, v); }
-    res.status(upstream.status).send(payload);
+    const request = route.request({ params: req.params as Record<string, string>, query: req.query as Record<string, string | undefined>, body: req.body ?? {} });
+    const out = await unary<any>((cb) => route.call(request, metadata, { deadline: Date.now() + DEADLINE_MS }, cb));
+    const etag = route.etag?.(out);
+    if (etag !== undefined && req.get('if-none-match') === etag) { log(req, route, 304, started, role, userId); res.status(304).end(); return; }
+    if (etag !== undefined) res.set('ETag', etag);
+    log(req, route, 200, started, role, userId);
+    res.json(route.pick ? route.pick(out) : out);
   } catch (e) {
-    console.error(`[gateway] ${req.method} ${req.originalUrl} -> ${url} failed: ${(e as Error).message}`);
-    res.status(502).json({ error: `the service behind ${req.path} is not reachable` });
+    const err = e as grpc.ServiceError;
+    const status = HTTP_STATUS[err.code] ?? 500;
+    const raw = err.metadata?.get('error-details-bin')[0];
+    const details = raw ? JSON.parse(raw.toString()) : undefined;
+    log(req, route, status, started, role, userId, err.code === grpc.status.UNAVAILABLE ? err.message : undefined);
+    res.status(status).json({ error: status === 502 ? `the service behind ${req.path} is not reachable` : err.details ?? err.message, ...(details !== undefined ? { details } : {}) });
   }
-});
+};
 
-app.listen(PORT, () => console.log(`[gateway] REST on :${PORT}`));
+const log = (req: Request, route: Route, status: number, started: number, role: string, userId: string, note?: string) =>
+  console.log(`[gateway] ${role}:${userId} ${req.method} ${req.originalUrl} -> gRPC ${route.label} ${status} (${Date.now() - started} ms)${note ? ` ${note}` : ''}`);
+
+for (const route of ROUTES) app[route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete'](route.path, handle(route));
+app.use((req, res) => { res.status(404).json({ error: `no route for ${req.method} ${req.path}` }); });
+
+app.listen(PORT, () => console.log(`[gateway] REST on :${PORT}, gRPC to ${ROUTES.length} routes of three services`));

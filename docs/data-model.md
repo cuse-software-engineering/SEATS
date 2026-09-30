@@ -7,7 +7,7 @@ from another it asks by gRPC. The diagrams are the source of the types; the chai
 ```
 ER diagram (this file)  ->  src/model.ts of the service     the entities as TypeScript types, used by domain.ts and store.ts
                         ->  proto/*.proto messages          the projection that crosses services (only what a caller needs)
-                        ->  REST bodies (contracts.md)      the model minus internals (parameters snapshot, version, …)
+                        ->  gateway routes (contracts.md)   the same messages as JSON, one route per method (parameters snapshot, version, …)
 ```
 
 Change the diagram first, then `model.ts`, then the `.proto` (and `npm run proto`), then `contracts.md`.

@@ -1,8 +1,3 @@
-import { restApp } from './rest.js';
 import { startGrpc } from './grpc.js';
 
-const REST_PORT = Number(process.env.PORT ?? 4003);
-const GRPC_PORT = Number(process.env.GRPC_PORT ?? 5003);
-
-startGrpc(GRPC_PORT);
-restApp().listen(REST_PORT, () => console.log(`[table-availability] REST on :${REST_PORT}`));
+startGrpc(Number(process.env.GRPC_PORT ?? 5003));   // the only transport (ADR-12): the gateway and the other services call it by gRPC

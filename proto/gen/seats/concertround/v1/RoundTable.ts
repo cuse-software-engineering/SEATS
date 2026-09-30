@@ -8,6 +8,12 @@ export interface RoundTable {
   'tableTypeId'?: (string);
   'capacity'?: (number);
   'forSale'?: (boolean);
+  'tableTypeName'?: (string);
+  'x'?: (number);
+  'y'?: (number);
+  'packagePrice'?: (number);
+  'packageContent'?: (string);
+  '_packagePrice'?: "packagePrice";
 }
 
 export interface RoundTable__Output {
@@ -17,4 +23,9 @@ export interface RoundTable__Output {
   'tableTypeId': (string);
   'capacity': (number);
   'forSale': (boolean);
+  'tableTypeName': (string);
+  'x': (number);
+  'y': (number);
+  'packagePrice'?: (number);
+  'packageContent': (string);
 }

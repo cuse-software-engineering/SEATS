@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deliverable 3 demo, parts 1 and 2: REST CRUD on the Concert Round Service and the Create Booking flow,
-# every call through the API Gateway (:4000). Needs curl and jq; start the services first (npm run dev).
+# Deliverable 3 demo, parts 1 and 2: REST CRUD on zone maps and rounds and the Create Booking flow, every call to the
+# API Gateway (:4000), which makes one gRPC call per route (watch its log). Needs curl and jq; start the services first (npm run dev).
 set -euo pipefail
 G=${GATEWAY:-http://localhost:4000}
 MANAGER=(-H 'x-user-id: manager-nok' -H 'x-role: manager' -H 'content-type: application/json')

@@ -1,59 +1,175 @@
-// SEATS — gRPC API of the Concert Round Service (project document Table 5.3, ADR-12).
-// Only the operations that OTHER SERVICES call are here; the back-office uses the REST API (docs/contracts.md).
-// Owner: Natchy. Changing a message here changes the Booking Service too: tell its owner.
+// SEATS — gRPC API of the Concert Round Service: its only API (ADR-12). The API Gateway maps the back-office and
+// customer routes of docs/contracts.md onto it; the Booking Service calls GetRound, GetRoundPricing, GetCheckInWindow.
+// Owner: Natchy. Changing a message here changes the gateway and the Booking Service too: tell their owners.
+// The "REST service with CRUD" of Deliverable 3 is the gateway's REST API over this service: zone maps and rounds are
+// created (Create…), read (Get…/List…), updated (Update…) and deleted (DiscardDraft…).
 syntax = "proto3";
 
 package seats.concertround.v1;
 
 service ConcertRound {
-  rpc GetRound(GetRoundRequest) returns (Round);                        // Booking: is booking open? which tables?
-  rpc GetRoundPricing(GetRoundPricingRequest) returns (RoundPricing);   // Booking: calculateTableFee()
-  rpc GetCheckInWindow(GetCheckInWindowRequest) returns (CheckInWindow); // Booking: booking terms, ticket verification
+  // the venue: table types and business parameters
+  rpc DefineTableType(DefineTableTypeRequest) returns (TableType);
+  rpc ListTableTypes(Empty) returns (TableTypeList);
+  rpc GetBusinessParameters(Empty) returns (BusinessParameters);
+  rpc UpdateBusinessParameters(UpdateBusinessParametersRequest) returns (BusinessParameters);
+  // zone maps (UC-04): C R U D
+  rpc CreateZoneMap(CreateZoneMapRequest) returns (ZoneMap);
+  rpc ListZoneMaps(ListZoneMapsRequest) returns (ZoneMapList);
+  rpc GetZoneMap(ZoneMapRef) returns (ZoneMap);
+  rpc UpdateZoneMap(UpdateZoneMapRequest) returns (ZoneMap);
+  rpc UploadZoneMapImage(UploadZoneMapImageRequest) returns (ZoneMap);
+  rpc ValidateZoneMap(ZoneMapRef) returns (ValidationResult);
+  rpc ActivateZoneMap(ZoneMapRef) returns (ZoneMap);
+  rpc DiscardDraftZoneMap(ZoneMapRef) returns (Removed);
+  // concert rounds (UC-03, UC-01): C R U D
+  rpc CreateRound(CreateRoundRequest) returns (Round);
+  rpc GetUpcomingRounds(Empty) returns (UpcomingRoundList);
+  rpc GetRound(RoundRef) returns (Round);                      // also the Booking Service: is booking open? which tables?
+  rpc GetRoundTables(RoundRef) returns (RoundTableList);
+  rpc UpdateRound(UpdateRoundRequest) returns (Round);         // Published: only what UC-03 AF-3 allows (BRULE-07)
+  rpc ValidateRound(RoundRef) returns (ValidationResult);
+  rpc PublishRound(RoundRef) returns (Round);                  // calls TableAvailability.CreateRoundTableStatus
+  rpc DiscardDraftRound(RoundRef) returns (Removed);
+  // reads of the Booking Service
+  rpc GetRoundPricing(RoundRef) returns (RoundPricing);        // setPartySize() computes the fee from it
+  rpc GetCheckInWindow(RoundRef) returns (CheckInWindow);      // booking terms, ticket verification
 }
 
-message GetRoundRequest { string round_id = 1; }
-message GetRoundPricingRequest { string round_id = 1; }
-message GetCheckInWindowRequest { string round_id = 1; }
+message Empty {}
+message Removed { bool removed = 1; }
+message ValidationResult { bool valid = 1; repeated string problems = 2; }
+message ZoneMapRef { string zone_map_id = 1; }
+message RoundRef { string round_id = 1; }
 
-message RoundTable {
-  int32 table_number = 1;
+// ---- table types and business parameters (FR-37, FR-38)
+message TableType { string id = 1; string name = 2; int32 capacity = 3; string package_content = 4; }
+message DefineTableTypeRequest { string id = 1; string name = 2; int32 capacity = 3; string package_content = 4; }
+message TableTypeList { repeated TableType table_types = 1; }
+
+message BusinessParameters {
+  int32 hold_period_minutes = 1;    // BRULE-02
+  int32 check_in_window_hours = 2;  // BRULE-04
+  int32 grace_period_minutes = 3;   // BRULE-05
+  int32 extra_person_fee = 4;       // BRULE-09, THB
+}
+message UpdateBusinessParametersRequest {   // a field left out is not changed
+  optional int32 hold_period_minutes = 1;
+  optional int32 check_in_window_hours = 2;
+  optional int32 grace_period_minutes = 3;
+  optional int32 extra_person_fee = 4;
+}
+
+// ---- zone maps (UC-04)
+message Zone { string id = 1; string name = 2; }
+message ZoneMapTable {
+  int32 table_number = 1;   // unique in the map (FR-74)
   string zone_id = 2;
-  string zone_name = 3;
-  string table_type_id = 4;
-  int32 capacity = 5;
-  bool for_sale = 6;
+  string table_type_id = 3;
+  int32 capacity = 4;
+  int32 x = 5;
+  int32 y = 6;
 }
-
-message Round {
-  string round_id = 1;
+message ZoneSummary { string zone_id = 1; string name = 2; int32 tables = 3; int32 capacity = 4; }
+message ZoneMap {
+  string id = 1;
   string name = 2;
-  string artist = 3;
-  string status = 4;             // Draft | Published
-  string date = 5;               // YYYY-MM-DD, venue local time
-  string doors_open_at = 6;      // RFC 3339
-  string start_at = 7;           // RFC 3339
-  string booking_open_at = 8;    // RFC 3339 (BRULE-07)
-  string zone_map_id = 9;
-  int32 hold_period_minutes = 10; // business parameter in force for this round (FR-38, BRULE-02)
-  repeated RoundTable tables = 11;
+  string status = 3;                 // Draft | Active
+  string image_url = 4;              // Media Storage Adapter (FR-39)
+  repeated Zone zones = 5;
+  repeated ZoneMapTable tables = 6;
+  string created_at = 7;
+  repeated ZoneSummary summary = 8;  // tables and capacity per zone (UC-04 step 7)
 }
+message ZoneMapSummary { string id = 1; string name = 2; string status = 3; int32 tables = 4; }
+message ZoneMapList { repeated ZoneMapSummary zone_maps = 1; }
+message CreateZoneMapRequest { optional string name = 1; }
+message ListZoneMapsRequest { optional string status = 1; }
+message ZoneList { repeated Zone zones = 1; }
+message ZoneMapTableList { repeated ZoneMapTable tables = 1; }
+message UpdateZoneMapRequest {   // a field left out is not changed; an Active map accepts only the changes of UC-04 AF-1
+  string zone_map_id = 1;
+  optional string name = 2;
+  ZoneList zones = 3;
+  ZoneMapTableList tables = 4;
+}
+message UploadZoneMapImageRequest { string zone_map_id = 1; string file_name = 2; }
 
+// ---- concert rounds (UC-03)
 message PackagePrice {
   string zone_id = 1;
   string table_type_id = 2;
   int32 package_price = 3;       // THB (BRULE-08)
   string package_content = 4;
 }
-
-message RoundPricing {
-  string round_id = 1;
-  repeated PackagePrice prices = 2;
-  int32 extra_person_fee = 3;    // THB per person above the table type's capacity (BRULE-09)
-}
-
 message CheckInWindow {
   string round_id = 1;
   string opens_at = 2;           // start − check-in window (2 h, BRULE-04)
   string start_at = 3;
   string grace_ends_at = 4;      // start + grace period (30 min, BRULE-05); after it the booking is a no-show
+}
+message RoundTable {             // a table of a round as the Customer and the Booking Service see it: map, type and price joined
+  int32 table_number = 1;
+  string zone_id = 2;
+  string zone_name = 3;
+  string table_type_id = 4;
+  int32 capacity = 5;
+  bool for_sale = 6;
+  string table_type_name = 7;
+  int32 x = 8;
+  int32 y = 9;
+  optional int32 package_price = 10;   // absent until the round prices this zone and type
+  string package_content = 11;
+}
+message RoundTableList { repeated RoundTable tables = 1; }
+message Round {
+  string id = 1;
+  string name = 2;
+  string artist = 3;
+  string status = 4;                     // Draft | Published
+  string date = 5;                       // YYYY-MM-DD, venue local time
+  string doors_open_at = 6;              // RFC 3339
+  string start_at = 7;
+  string booking_open_at = 8;            // BRULE-07
+  string zone_map_id = 9;
+  repeated int32 tables_not_for_sale = 10;
+  repeated PackagePrice prices = 11;
+  CheckInWindow check_in_window = 12;    // absent until the round has a start time
+  BusinessParameters parameters = 13;    // snapshot at publish: the values in force for this round (FR-38)
+  string created_at = 14;
+  int32 hold_period_minutes = 15;        // in force for this round (BRULE-02)
+  repeated RoundTable tables = 16;
+  optional int32 confirmed_bookings = 17;   // UpdateRound on a Published round: bookings that keep their table (AF-3)
+}
+message UpcomingRound {
+  string id = 1;
+  string name = 2;
+  string artist = 3;
+  string date = 4;
+  string start_at = 5;
+  string booking_open_at = 6;
+  string status = 7;             // not yet open | open | sold out (UC-01 AF-1, AF-2)
+  int32 available_tables = 8;
+  int32 tables_for_sale = 9;
+}
+message UpcomingRoundList { repeated UpcomingRound rounds = 1; }
+message CreateRoundRequest { optional string name = 1; }
+message TableNumbers { repeated int32 values = 1; }
+message PackagePrices { repeated PackagePrice values = 1; }
+message UpdateRoundRequest {     // a field left out is not changed
+  string round_id = 1;
+  optional string name = 2;
+  optional string artist = 3;
+  optional string date = 4;
+  optional string doors_open_at = 5;
+  optional string start_at = 6;
+  optional string booking_open_at = 7;
+  optional string zone_map_id = 8;
+  TableNumbers tables_not_for_sale = 9;
+  PackagePrices prices = 10;
+}
+message RoundPricing {
+  string round_id = 1;
+  repeated PackagePrice prices = 2;
+  int32 extra_person_fee = 3;    // THB per person above the table type's capacity (BRULE-09)
 }

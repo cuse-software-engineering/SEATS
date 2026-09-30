@@ -8,6 +8,7 @@ SVC=seats.tableavailability.v1.TableAvailability
 g() { grpcurl -plaintext -import-path proto -proto table_availability.proto -d "$2" "$ADDR" "$SVC/$1"; }
 step() { printf '\n\033[1;35m== %s\033[0m\n' "$*"; }
 
+step "Health (grpc.health.v1)"; grpcurl -plaintext -import-path proto -proto health.proto "$ADDR" grpc.health.v1.Health/Check
 step "C  CreateRoundTableStatus"; g CreateRoundTableStatus '{"round_id":"demo-round","tables":[{"table_number":1,"for_sale":true},{"table_number":2,"for_sale":true},{"table_number":3,"for_sale":false}]}'
 step "R  GetRoundTableStatus";        g GetRoundTableStatus '{"round_id":"demo-round"}'
 step "R  CountAvailableTables";       g CountAvailableTables '{"round_ids":["demo-round","unknown"]}'

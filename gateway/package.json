@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "API Gateway: the only entry for the web apps; fake auth by headers in progress 1; routes each request to the owning service.",
+  "description": "API Gateway: the only REST API; fake auth by headers in progress 1; each route is one gRPC call to the owning service.",
   "scripts": { "dev": "tsx src/server.ts", "build": "tsc -p .", "typecheck": "tsc -p . --noEmit", "start": "node dist/server.js" },
-  "dependencies": { "express": "^5.1.0" },
-  "devDependencies": { "@types/express": "^5.0.0" }
+  "dependencies": { "@grpc/grpc-js": "^1.12.0", "@grpc/proto-loader": "^0.7.13", "express": "^5.1.0" },
+  "devDependencies": { "@seats/proto": "*", "@types/express": "^5.0.0" }
 }

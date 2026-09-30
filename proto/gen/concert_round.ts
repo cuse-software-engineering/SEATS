@@ -11,15 +11,41 @@ export interface ProtoGrpcType {
   seats: {
     concertround: {
       v1: {
+        BusinessParameters: MessageTypeDefinition
         CheckInWindow: MessageTypeDefinition
         ConcertRound: SubtypeConstructor<typeof grpc.Client, _seats_concertround_v1_ConcertRoundClient> & { service: _seats_concertround_v1_ConcertRoundDefinition }
-        GetCheckInWindowRequest: MessageTypeDefinition
-        GetRoundPricingRequest: MessageTypeDefinition
-        GetRoundRequest: MessageTypeDefinition
+        CreateRoundRequest: MessageTypeDefinition
+        CreateZoneMapRequest: MessageTypeDefinition
+        DefineTableTypeRequest: MessageTypeDefinition
+        Empty: MessageTypeDefinition
+        ListZoneMapsRequest: MessageTypeDefinition
         PackagePrice: MessageTypeDefinition
+        PackagePrices: MessageTypeDefinition
+        Removed: MessageTypeDefinition
         Round: MessageTypeDefinition
         RoundPricing: MessageTypeDefinition
+        RoundRef: MessageTypeDefinition
         RoundTable: MessageTypeDefinition
+        RoundTableList: MessageTypeDefinition
+        TableNumbers: MessageTypeDefinition
+        TableType: MessageTypeDefinition
+        TableTypeList: MessageTypeDefinition
+        UpcomingRound: MessageTypeDefinition
+        UpcomingRoundList: MessageTypeDefinition
+        UpdateBusinessParametersRequest: MessageTypeDefinition
+        UpdateRoundRequest: MessageTypeDefinition
+        UpdateZoneMapRequest: MessageTypeDefinition
+        UploadZoneMapImageRequest: MessageTypeDefinition
+        ValidationResult: MessageTypeDefinition
+        Zone: MessageTypeDefinition
+        ZoneList: MessageTypeDefinition
+        ZoneMap: MessageTypeDefinition
+        ZoneMapList: MessageTypeDefinition
+        ZoneMapRef: MessageTypeDefinition
+        ZoneMapSummary: MessageTypeDefinition
+        ZoneMapTable: MessageTypeDefinition
+        ZoneMapTableList: MessageTypeDefinition
+        ZoneSummary: MessageTypeDefinition
       }
     }
   }

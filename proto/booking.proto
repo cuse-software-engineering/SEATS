@@ -1,0 +1,79 @@
+// SEATS — gRPC API of the Booking Service: its only API (ADR-12). The API Gateway maps the customer and staff routes
+// of docs/contracts.md onto it and passes the caller in the metadata x-user-id and x-role; the Payment Service calls
+// ConfirmBookingPayment (progress 2). The booking is the source of truth of the hold (ADR-13).
+// Owner: Peat SE.
+syntax = "proto3";
+
+package seats.booking.v1;
+
+service Bookings {
+  // UC-01: hold the table, party size and fee
+  rpc CreateHeldBooking(CreateHeldBookingRequest) returns (Booking);   // first lock wins; FAILED_PRECONDITION when just taken
+  rpc GetBooking(BookingRef) returns (Booking);                        // own bookings only
+  rpc SetPartySize(SetPartySizeRequest) returns (Booking);             // computes the fee in the same call
+  // UC-09: customer profile
+  rpc GetCustomerProfile(Empty) returns (CustomerProfile);             // NOT_FOUND before the first booking
+  rpc CreateCustomerProfile(CustomerProfileRequest) returns (CustomerProfile);
+  rpc UpdateCustomerProfile(CustomerProfileRequest) returns (CustomerProfile);
+  // UC-01: terms, payment, cancel, My Bookings
+  rpc GetBookingTerms(BookingRef) returns (BookingTerms);
+  rpc AcceptBookingTerms(BookingRef) returns (Booking);
+  rpc StartPayment(BookingRef) returns (PaymentRequest);               // UC-10; UNIMPLEMENTED in progress 1
+  rpc CancelBooking(BookingRef) returns (Booking);
+  rpc GetCustomerBookings(Empty) returns (BookingList);
+  rpc GetETicket(BookingRef) returns (ETicket);                        // progress 2
+  // UC-02: check-in (progress 2)
+  rpc VerifyBookingReference(BookingReference) returns (VerificationResult);
+  rpc CheckInBooking(BookingReference) returns (Booking);
+  // live view (FR-42)
+  rpc GetRoundBookings(RoundRef) returns (BookingList);
+  // Payment Service (progress 2)
+  rpc ConfirmBookingPayment(ConfirmBookingPaymentRequest) returns (Booking);   // idempotent; issues the e-ticket
+}
+
+message Empty {}
+message BookingRef { string booking_id = 1; }
+message RoundRef { string round_id = 1; }
+message BookingReference { string booking_reference = 1; }
+
+message CreateHeldBookingRequest { string round_id = 1; int32 table_number = 2; }
+message SetPartySizeRequest { string booking_id = 1; int32 party_size = 2; }
+message CustomerProfileRequest {   // create: name, phone and consent; update: the fields to change
+  optional string name = 1;
+  optional string phone = 2;       // Thai mobile number
+  optional bool consent = 3;       // PDPA consent (FR-10, BRULE-11)
+}
+message ConfirmBookingPaymentRequest { string booking_id = 1; string payment_id = 2; int32 amount = 3; }
+
+message Fee {
+  int32 package_price = 1;     // BRULE-08
+  int32 extra_persons = 2;
+  int32 extra_person_fee = 3;  // BRULE-09
+  int32 full_table_fee = 4;    // BRULE-01
+}
+message StatusChange { string status = 1; string at = 2; string by = 3; }   // one transition: the audit trail (ADR-13)
+message Booking {
+  string id = 1;
+  string customer_id = 2;          // LINE user id (BRULE-12)
+  string round_id = 3;
+  int32 table_number = 4;
+  string zone_id = 5;              // copied from the round at hold time (BRULE-07)
+  string zone_name = 6;
+  string table_type_id = 7;
+  int32 capacity = 8;
+  string status = 9;               // Held | Confirmed | Checked-in | Cancelled | Expired | No-show
+  string hold_ends_at = 10;        // BRULE-02
+  optional int32 party_size = 11;
+  Fee fee = 12;                    // absent until the party size is set
+  bool terms_accepted = 13;        // BRULE-16
+  string created_at = 14;
+  repeated StatusChange history = 15;
+  int32 remaining_hold_seconds = 16;   // 0 unless Held
+}
+message BookingList { repeated Booking bookings = 1; }
+message CustomerProfile { string customer_id = 1; string name = 2; string phone = 3; string consent_at = 4; }
+message CheckInWindow { string round_id = 1; string opens_at = 2; string start_at = 3; string grace_ends_at = 4; }
+message BookingTerms { string booking_id = 1; repeated string terms = 2; CheckInWindow check_in_window = 3; }
+message PaymentRequest { string payment_id = 1; string checkout_url = 2; }
+message ETicket { string booking_id = 1; string booking_reference = 2; string qr_payload = 3; }
+message VerificationResult { bool valid = 1; Booking booking = 2; string reason = 3; }

@@ -1,0 +1,15 @@
+// The standard gRPC health checking protocol (grpc.health.v1), served by every SEATS service; the API Gateway's
+// GET /health calls Check on each of them, and `grpcurl … grpc.health.v1.Health/Check` works on any service.
+syntax = "proto3";
+
+package grpc.health.v1;
+
+service Health {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message HealthCheckRequest { string service = 1; }
+message HealthCheckResponse {
+  enum ServingStatus { UNKNOWN = 0; SERVING = 1; NOT_SERVING = 2; SERVICE_UNKNOWN = 3; }
+  ServingStatus status = 1;
+}
