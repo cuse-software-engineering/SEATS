@@ -1,0 +1,21 @@
+// SEATS — gRPC API of the Notification Service: its only API (ADR-12). One method per notice of the project document;
+// the LINE Messaging Adapter is a stub in progress 1: the service records the message and logs what it would push.
+// Callers: Booking Service (confirmation, hold expired) and Payment Service (payment failed), progress 2.
+syntax = "proto3";
+
+package seats.notification.v1;
+
+service Notification {
+  rpc SendBookingConfirmation(NotificationRequest) returns (NotificationResult);   // UC-01 step 20
+  rpc SendHoldExpiredNotice(NotificationRequest) returns (NotificationResult);     // UC-01 EF-1
+  rpc SendPaymentFailedNotice(NotificationRequest) returns (NotificationResult);   // UC-10 AF
+}
+
+message NotificationRequest {
+  string customer_id = 1;        // LINE user id (BRULE-12)
+  string booking_id = 2;
+  string round_name = 3;
+  int32 table_number = 4;
+}
+
+message NotificationResult { string message_id = 1; bool delivered = 2; }

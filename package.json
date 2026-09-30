@@ -5,14 +5,19 @@
   "workspaces": [
     "proto",
     "gateway",
-    "services/*"
+    "services/*",
+    "frontend/*"
   ],
   "scripts": {
     "proto": "proto-loader-gen-types --keepCase=false --longs=Number --defaults=true --grpcLib=@grpc/grpc-js --outDir=proto/gen proto/*.proto",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
-    "dev": "concurrently -n gateway,round,tables,booking -c green,magenta,cyan,yellow \"npm -w gateway run dev\" \"npm -w services/concert-round run dev\" \"npm -w services/table-availability run dev\" \"npm -w services/booking run dev\"",
-    "smoke": "node demo/smoke.mjs"
+    "dev": "concurrently -n gateway,round,tables,booking,payment,notify,staff -c green,magenta,cyan,yellow,blue,white,gray \"npm -w gateway run dev\" \"npm -w services/concert-round run dev\" \"npm -w services/table-availability run dev\" \"npm -w services/booking run dev\" \"npm -w services/payment run dev\" \"npm -w services/notification run dev\" \"npm -w services/staff-account run dev\"",
+    "test": "npm test --workspaces --if-present",
+    "smoke": "node demo/smoke.mjs",
+    "dev:customer": "npm -w frontend/customer-web-app run dev",
+    "dev:backoffice": "npm -w frontend/back-office-web-app run dev",
+    "build:frontend": "npm run build -w frontend/shared -w frontend/customer-web-app -w frontend/back-office-web-app"
   },
   "devDependencies": {
     "@grpc/proto-loader": "^0.7.13",

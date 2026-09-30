@@ -1,0 +1,36 @@
+// SEATS — gRPC API of the Staff Account Service: its only API (ADR-12, ADR-07). Staff sign in with a username and a
+// password and get a session token; the manager creates, updates and disables the accounts of the back-office.
+// Callers: the API Gateway (sessions, staff accounts).
+syntax = "proto3";
+
+package seats.staffaccount.v1;
+
+service StaffAccounts {
+  rpc SignIn(Credentials) returns (Session);                                  // UNAUTHENTICATED on a wrong password or a Disabled account
+  rpc SignOut(SessionRef) returns (Empty);                                    // idempotent
+  rpc CreateStaffAccount(CreateStaffAccountRequest) returns (StaffAccount);   // C
+  rpc ListStaffAccounts(Empty) returns (StaffAccountList);                    // R
+  rpc UpdateStaffAccount(UpdateStaffAccountRequest) returns (StaffAccount);   // U: role and/or password
+  rpc DisableStaffAccount(StaffAccountRef) returns (StaffAccount);            // D: status Disabled, sessions revoked
+}
+
+message Empty {}
+message SessionRef { string token = 1; }
+message StaffAccountRef { string staff_account_id = 1; }
+
+message Credentials { string username = 1; string password = 2; }
+message Session { string token = 1; string role = 2; string staff_account_id = 3; }
+
+message StaffAccount {
+  string staff_account_id = 1;
+  string username = 2;
+  string role = 3;               // manager | front_staff | owner (Table 5.2)
+  string status = 4;             // Active | Disabled
+}
+message StaffAccountList { repeated StaffAccount accounts = 1; }
+message CreateStaffAccountRequest { string username = 1; string role = 2; string password = 3; }
+message UpdateStaffAccountRequest {   // a field left out is not changed
+  string staff_account_id = 1;
+  optional string role = 2;
+  optional string password = 3;
+}

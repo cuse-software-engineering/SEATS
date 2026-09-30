@@ -145,7 +145,65 @@ transition. The booking copies zone, table type and capacity from the round when
 the ticket do not change if the map is edited later (BRULE-07). Progress 2 adds the e-ticket (signed booking reference), the
 payment reference and the check-in record (time, staff account) to `BOOKING`.
 
+## Payment Service — Payment DB
+
+```mermaid
+erDiagram
+    PAYMENT {
+        string paymentId PK
+        string bookingId "reference to the Booking DB"
+        string customerId "LINE user id"
+        int amount "THB, the full table fee (BRULE-01)"
+        string status "Pending | Paid | Failed"
+        string checkoutUrl "simulated Payment Gateway (ADR-11)"
+        string createdAt
+        string resultAt "when the gateway's result was recorded"
+    }
+```
+
+One document per payment request; the result is recorded once (a duplicate callback is ignored).
+
+## Notification Service — Notification DB
+
+```mermaid
+erDiagram
+    MESSAGE {
+        string messageId PK
+        string customerId "LINE user id"
+        string bookingId "reference to the Booking DB"
+        string kind "BookingConfirmation | HoldExpiredNotice | PaymentFailedNotice"
+        string text
+        boolean delivered
+        string sentAt
+    }
+```
+
+## Staff Account Service — Staff Account DB
+
+```mermaid
+erDiagram
+    STAFF_ACCOUNT ||--o{ SESSION : "signs in as"
+
+    STAFF_ACCOUNT {
+        string staffAccountId PK
+        string username "unique"
+        string role "manager | front_staff | owner (Table 5.2)"
+        string status "Active | Disabled"
+        string passwordSalt
+        string passwordHash "scrypt"
+        string createdAt
+    }
+    SESSION {
+        string token PK
+        string staffAccountId FK
+        string role
+        string createdAt
+    }
+```
+
+Sessions are in memory in progress 1 (ADR-07); disabling an account ends its sessions.
+
 ## Not modelled yet
 
-Payment DB, Notification DB and Staff Account DB come with their services in progress 2; the message broker, service
-discovery and a relational database next to MongoDB are open decisions (KI-14 of the project document).
+The message broker, service discovery and a relational database next to MongoDB are open decisions (KI-14 of the
+project document); the check-in record and the e-ticket fields of `BOOKING` come with progress 2.

@@ -1,0 +1,38 @@
+// SEATS — gRPC API of the Payment Service: its only API (ADR-12). The Payment Gateway is simulated in progress 1
+// (ADR-11): CreatePaymentRequest answers a fake checkout URL and the gateway's result comes back through the API
+// Gateway's webhook route as ReceivePaymentResult. Callers: Booking Service (startPayment, progress 2) and the API Gateway.
+syntax = "proto3";
+
+package seats.payment.v1;
+
+service Payment {
+  rpc CreatePaymentRequest(CreatePaymentRequestRequest) returns (PaymentRequest);   // C: a Pending payment for a booking
+  rpc ReceivePaymentResult(PaymentResult) returns (PaymentResultAck);              // U: the webhook of the Payment Gateway; idempotent
+  rpc GetPaymentStatus(PaymentRef) returns (PaymentStatus);                        // R
+}
+
+message PaymentRef { string payment_id = 1; }
+
+message CreatePaymentRequestRequest {
+  string booking_id = 1;
+  int32 amount = 2;              // THB, the full table fee (BRULE-01)
+  string customer_id = 3;
+}
+
+message PaymentRequest { string payment_id = 1; string checkout_url = 2; }
+
+message PaymentResult {
+  string payment_id = 1;
+  string status = 2;             // Paid | Failed
+  int32 amount = 3;              // must equal the amount of the request
+  string signature = 4;          // simulated: "sim-" + payment_id
+}
+
+message PaymentResultAck { bool accepted = 1; }
+
+message PaymentStatus {
+  string payment_id = 1;
+  string booking_id = 2;
+  string status = 3;             // Pending | Paid | Failed
+  int32 amount = 4;
+}

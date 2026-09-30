@@ -1,0 +1,23 @@
+{
+  "name": "@seats/frontend-shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared by the two web apps: the API types generated from docs/openapi.yaml, the typed fetch client, the fake-auth session and small React helpers. The apps compile the TypeScript sources themselves (Vite).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "api-types": "openapi-typescript ../../docs/openapi.yaml -o src/api-types.d.ts",
+    "typecheck": "tsc -p . --noEmit",
+    "build": "tsc -p . --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^18.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "openapi-typescript": "^7.6.0",
+    "typescript": "^5.7.0"
+  }
+}

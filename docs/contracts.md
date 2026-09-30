@@ -22,16 +22,21 @@ never speaks REST, and a service never calls another service through the gateway
 | `GET`, `POST`, `PUT /api/customers/me`; `GET /api/customers/me/bookings` | Bookings/GetCustomerProfile, CreateCustomerProfile, UpdateCustomerProfile, GetCustomerBookings | customer |
 | `POST /api/check-ins/verify`, `POST /api/check-ins` | Bookings/VerifyBookingReference, CheckInBooking | front_staff, manager |
 | `GET /api/rounds/:id/bookings` | Bookings/GetRoundBookings | manager, owner |
+| `POST /api/payments/webhook` | Payment/ReceivePaymentResult | none: the Payment Gateway's callback, checked by its signature (ADR-11) |
+| `GET /api/payments/:id` | Payment/GetPaymentStatus | customer |
+| `POST /api/sessions`; `DELETE /api/sessions/current` | StaffAccounts/SignIn, SignOut | sign-in: none; sign-out: manager, front_staff, owner (the token of `Authorization: Bearer <token>`, else `x-user-id`) |
+| `POST`, `GET /api/staff-accounts`; `PUT`, `DELETE /api/staff-accounts/:id` | StaffAccounts/CreateStaffAccount, ListStaffAccounts, UpdateStaffAccount, DisableStaffAccount | write: manager; read: manager, owner |
 
-A list message (`TableTypeList`, `ZoneMapList`, `UpcomingRoundList`, `RoundTableList`, `BookingList`) is unwrapped
-to a JSON array. `GET /health` calls `grpc.health.v1.Health/Check` on every service. The gateway holds no business
+A list message (`TableTypeList`, `ZoneMapList`, `UpcomingRoundList`, `RoundTableList`, `BookingList`, `StaffAccountList`)
+is unwrapped to a JSON array. A route with the role `none` needs no `x-user-id` / `x-role` headers and skips the role
+check. `GET /health` calls `grpc.health.v1.Health/Check` on every service. The gateway holds no business
 logic: `gateway/src/routes.ts` is the whole mapping, and a route's request builder is type-checked against the
 generated request message.
 
 | gRPC status of the service | HTTP status |
 |---|---|
 | `INVALID_ARGUMENT` | 400 `{error, details?}` |
-| `UNAUTHENTICATED` | 401 |
+| `UNAUTHENTICATED` (a refused sign-in) | 401 |
 | `PERMISSION_DENIED` (and a role refused by the gateway itself) | 403 |
 | `NOT_FOUND` | 404 |
 | `FAILED_PRECONDITION`, `ALREADY_EXISTS`, `ABORTED` (a rule refuses the change, e.g. the table was just taken) | 409 `{error, details?}` |
@@ -103,3 +108,41 @@ The caller is the metadata `x-user-id`; every read is restricted to the caller's
 | verifyBookingReference(), checkInBooking(), getETicket() | VerifyBookingReference, CheckInBooking, GetETicket | `POST /check-ins/verify`, `POST /check-ins`, `GET /bookings/:id/e-ticket` | UNIMPLEMENTED: progress 2; the e-ticket is issued inside confirmBookingPayment() |
 | confirmBookingPayment() | ConfirmBookingPayment `{booking_id, payment_id, amount}` | — | the Payment Service, progress 2 |
 | hold-expiry job | not an operation: every 5 s | — | gRPC ReleaseHold; the hold-expired notice is a log line for now |
+
+## Payment Service (gRPC :5004, `proto/payment.proto`)
+
+The Payment Gateway is simulated in progress 1 (ADR-11): the checkout URL is fake, and the gateway's callback is the
+route `POST /payments/webhook`, accepted when its signature is `sim-<payment_id>`. Status values: `Pending`, `Paid`,
+`Failed`. Confirming the booking (gRPC ConfirmBookingPayment) and the payment-failed notice come in progress 2.
+
+| Operation | gRPC method | Route | Notes |
+|---|---|---|---|
+| createPaymentRequest() | CreatePaymentRequest `{booking_id, amount, customer_id}` | — | the Booking Service: startPayment() (progress 2); a Pending payment and `checkout_url` `https://checkout.example/pay/<payment_id>` (C) |
+| receivePaymentResult() | ReceivePaymentResult `{payment_id, status, amount, signature}` | `POST /payments/webhook` | wrong signature → INVALID_ARGUMENT; amount ≠ requested → FAILED_PRECONDITION; Paid or Failed recorded once, a duplicate answers `{accepted: true}` (U) |
+| getPaymentStatus() | GetPaymentStatus `{payment_id}` | `GET /payments/:id` | `{payment_id, booking_id, status, amount}`; NOT_FOUND when unknown (R) |
+
+## Notification Service (gRPC :5005, `proto/notification.proto`)
+
+No route: the services call it. The LINE Messaging Adapter is a stub in progress 1: each notice is recorded and logged as
+`[notification] LINE push to <customer_id>: <kind>`, and the result is `{message_id, delivered: true}`.
+
+| Operation | gRPC method | Route | Notes |
+|---|---|---|---|
+| sendBookingConfirmation() | SendBookingConfirmation `{customer_id, booking_id, round_name, table_number}` | — | the Booking Service: confirmBookingPayment() (progress 2) |
+| sendHoldExpiredNotice() | SendHoldExpiredNotice (same request) | — | the Booking Service: hold-expiry job (progress 2) |
+| sendPaymentFailedNotice() | SendPaymentFailedNotice (same request) | — | the Payment Service (progress 2) |
+
+## Staff Account Service (gRPC :5006, `proto/staff_account.proto`)
+
+Staff sessions (ADR-07) and the accounts of the back-office. Roles: `manager`, `front_staff`, `owner` (Table 6.11 of the project document);
+status `Active` or `Disabled`. Progress 1 seeds `manager/manager`, `door1/door1` (front_staff) and `owner/owner`; the
+staff routes still trust the `x-user-id` / `x-role` headers, checking the bearer token comes in progress 2.
+
+| Operation | gRPC method | Route | Notes |
+|---|---|---|---|
+| signIn() | SignIn `{username, password}` | `POST /sessions` | `{token, role, staff_account_id}`; UNAUTHENTICATED (401) on a wrong password or a Disabled account |
+| signOut() | SignOut `{token}` | `DELETE /sessions/current` | ends the session; idempotent |
+| createStaffAccount() | CreateStaffAccount `{username, role, password}` | `POST /staff-accounts` | taken username → FAILED_PRECONDITION (C) |
+| listStaffAccounts() | ListStaffAccounts | `GET /staff-accounts` | (R) |
+| updateStaffAccount() | UpdateStaffAccount `{staff_account_id, role?, password?}` | `PUT /staff-accounts/:id` | a field left out is unchanged (U) |
+| disableStaffAccount() | DisableStaffAccount `{staff_account_id}` | `DELETE /staff-accounts/:id` | status Disabled, its sessions end; idempotent (D) |

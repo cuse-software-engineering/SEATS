@@ -1,0 +1,971 @@
+openapi: 3.0.3
+info:
+  title: SEATS API Gateway
+  version: 0.2.0
+  description: |
+    The only REST API of SEATS (Seating & Event Availability Tracking System). Every route is one gRPC call on the
+    service that owns the operation (project document, Section 6.7 and Table 6.11; ADR-12): the path parameters, the
+    query and the JSON body become the request message, the response message is the JSON answer with the same fields
+    in camelCase, and a list message is unwrapped to an array. `x-grpc` names the method behind each route, `x-roles`
+    the roles that may call it (FR-66) and `x-web-app` the web app that calls it (Appendix D).
+
+    Progress 1 authentication is fake: send the headers `x-user-id` (a LINE user id for a customer, a staff account
+    for the back-office) and `x-role` (`customer`, `manager`, `front_staff`, `owner`). LINE ID tokens (ADR-01) and
+    staff session tokens (ADR-07) replace them later; the routes and bodies do not change.
+
+    Errors are `{error, details?}`: 400 invalid input, 401 no identity, 403 role, 404 not found, 409 a rule refuses
+    the change (for example the table was just taken), 501 not built in this increment, 502 the service or one of
+    its collaborators is down, 504 the service did not answer in time.
+servers:
+  - url: http://localhost:4000
+    description: local development (npm run dev, docker compose up)
+tags:
+  - name: Concert Round Service
+    description: gRPC ConcertRound, port 5001 (proto/concert_round.proto)
+  - name: Table Availability Service
+    description: gRPC TableAvailability, port 5003 (proto/table_availability.proto)
+  - name: Booking Service
+    description: gRPC Bookings, port 5002 (proto/booking.proto)
+  - name: Payment Service
+    description: gRPC Payment, port 5004 (proto/payment.proto)
+  - name: Staff Account Service
+    description: gRPC StaffAccounts, port 5006 (proto/staff_account.proto)
+security:
+  - userId: []
+    role: []
+
+paths:
+  /health:
+    get:
+      summary: Health of the gateway and of every service (grpc.health.v1.Health/Check)
+      security: []
+      responses:
+        '200':
+          description: The gateway and the services it reaches
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service: { type: string, example: gateway }
+                  ok: { type: boolean }
+                  services:
+                    type: array
+                    items:
+                      type: object
+                      properties: { service: { type: string }, ok: { type: boolean } }
+
+  # ---------------------------------------------------------------- Concert Round Service: the venue
+  /api/table-types:
+    get:
+      tags: [Concert Round Service]
+      summary: List the table types (listTableTypes)
+      operationId: listTableTypes
+      x-grpc: ConcertRound/ListTableTypes
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      responses:
+        '200': { description: The table types, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TableType' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/table-types/{id}:
+    put:
+      tags: [Concert Round Service]
+      summary: Define or change a table type (defineTableType)
+      operationId: defineTableType
+      x-grpc: ConcertRound/DefineTableType
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TableTypeInput' } } } }
+      responses:
+        '200': { description: The table type, content: { application/json: { schema: { $ref: '#/components/schemas/TableType' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/business-parameters:
+    get:
+      tags: [Concert Round Service]
+      summary: Read the business parameters (getBusinessParameters)
+      operationId: getBusinessParameters
+      x-grpc: ConcertRound/GetBusinessParameters
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      responses:
+        '200': { description: The parameters in force, content: { application/json: { schema: { $ref: '#/components/schemas/BusinessParameters' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [Concert Round Service]
+      summary: Change the business parameters; a field left out is unchanged (updateBusinessParameters)
+      operationId: updateBusinessParameters
+      x-grpc: ConcertRound/UpdateBusinessParameters
+      x-roles: [manager]
+      x-web-app: back-office
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BusinessParametersUpdate' } } } }
+      responses:
+        '200': { description: The parameters now in force, content: { application/json: { schema: { $ref: '#/components/schemas/BusinessParameters' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---------------------------------------------------------------- Concert Round Service: zone maps (UC-04)
+  /api/zone-maps:
+    post:
+      tags: [Concert Round Service]
+      summary: Create a Draft zone map (createZoneMap)
+      operationId: createZoneMap
+      x-grpc: ConcertRound/CreateZoneMap
+      x-roles: [manager]
+      x-web-app: back-office
+      requestBody: { content: { application/json: { schema: { type: object, properties: { name: { type: string } } } } } }
+      responses:
+        '200': { description: The new map, content: { application/json: { schema: { $ref: '#/components/schemas/ZoneMap' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Concert Round Service]
+      summary: List the zone maps (listZoneMaps)
+      operationId: listZoneMaps
+      x-grpc: ConcertRound/ListZoneMaps
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [Draft, Active] }, description: Only the maps in this status }
+      responses:
+        '200': { description: The maps, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ZoneMapSummary' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/zone-maps/{id}:
+    get:
+      tags: [Concert Round Service]
+      summary: Read a zone map with its tables and the capacity per zone (getZoneMap)
+      operationId: getZoneMap
+      x-grpc: ConcertRound/GetZoneMap
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The map, content: { application/json: { schema: { $ref: '#/components/schemas/ZoneMap' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Concert Round Service]
+      summary: Change a zone map; a field left out is unchanged, an Active map accepts only the changes of UC-04 AF-1 (updateZoneMap)
+      operationId: updateZoneMap
+      x-grpc: ConcertRound/UpdateZoneMap
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ZoneMapUpdate' } } } }
+      responses:
+        '200': { description: The map, content: { application/json: { schema: { $ref: '#/components/schemas/ZoneMap' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Concert Round Service]
+      summary: Discard a Draft zone map (discardDraftZoneMap)
+      operationId: discardDraftZoneMap
+      x-grpc: ConcertRound/DiscardDraftZoneMap
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Removed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/zone-maps/{id}/image:
+    post:
+      tags: [Concert Round Service]
+      summary: Store the image of the venue for the map (uploadZoneMapImage)
+      operationId: uploadZoneMapImage
+      x-grpc: ConcertRound/UploadZoneMapImage
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [fileName], properties: { fileName: { type: string } } } } } }
+      responses:
+        '200': { description: The map with its imageUrl, content: { application/json: { schema: { $ref: '#/components/schemas/ZoneMap' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/zone-maps/{id}/validate:
+    post:
+      tags: [Concert Round Service]
+      summary: Validate a zone map, UC-04 S-1 (validateZoneMap)
+      operationId: validateZoneMap
+      x-grpc: ConcertRound/ValidateZoneMap
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/ValidationResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/zone-maps/{id}/activate:
+    post:
+      tags: [Concert Round Service]
+      summary: Activate a valid zone map; idempotent (activateZoneMap)
+      operationId: activateZoneMap
+      x-grpc: ConcertRound/ActivateZoneMap
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The Active map, content: { application/json: { schema: { $ref: '#/components/schemas/ZoneMap' } } } }
+        '400': { description: The map is not valid; details lists the problems, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- Concert Round Service: rounds (UC-03, UC-01)
+  /api/rounds:
+    post:
+      tags: [Concert Round Service]
+      summary: Create a Draft concert round (createRound)
+      operationId: createRound
+      x-grpc: ConcertRound/CreateRound
+      x-roles: [manager]
+      x-web-app: back-office
+      requestBody: { content: { application/json: { schema: { type: object, properties: { name: { type: string } } } } } }
+      responses:
+        '200': { description: The new round, content: { application/json: { schema: { $ref: '#/components/schemas/Round' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Concert Round Service]
+      summary: The upcoming Published rounds with their status, not yet open, open or sold out (getUpcomingRounds)
+      operationId: getUpcomingRounds
+      x-grpc: ConcertRound/GetUpcomingRounds
+      x-roles: [customer, manager, front_staff, owner]
+      x-web-app: both
+      responses:
+        '200': { description: The rounds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UpcomingRound' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/rounds/{id}:
+    get:
+      tags: [Concert Round Service]
+      summary: Read a round with its tables and the hold period in force (getRound)
+      operationId: getRound
+      x-grpc: ConcertRound/GetRound
+      x-roles: [customer, manager, front_staff, owner]
+      x-web-app: both
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The round, content: { application/json: { schema: { $ref: '#/components/schemas/Round' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Concert Round Service]
+      summary: Change a round; a field left out is unchanged, a Published round accepts only the changes of UC-03 AF-3 (updateRound)
+      operationId: updateRound
+      x-grpc: ConcertRound/UpdateRound
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RoundUpdate' } } } }
+      responses:
+        '200': { description: The round, content: { application/json: { schema: { $ref: '#/components/schemas/Round' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Concert Round Service]
+      summary: Discard a Draft round (discardDraftRound)
+      operationId: discardDraftRound
+      x-grpc: ConcertRound/DiscardDraftRound
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Removed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/rounds/{id}/tables:
+    get:
+      tags: [Concert Round Service]
+      summary: The tables of a round with zone, table type, capacity and package price (getRoundTables)
+      operationId: getRoundTables
+      x-grpc: ConcertRound/GetRoundTables
+      x-roles: [customer, manager, front_staff, owner]
+      x-web-app: both
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The tables, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RoundTable' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/rounds/{id}/validate:
+    post:
+      tags: [Concert Round Service]
+      summary: Validate a round, UC-03 S-1 (validateRound)
+      operationId: validateRound
+      x-grpc: ConcertRound/ValidateRound
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { $ref: '#/components/responses/ValidationResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/rounds/{id}/publish:
+    post:
+      tags: [Concert Round Service]
+      summary: Publish a valid round; snapshots the business parameters and creates the table map of the round; idempotent (publishRound)
+      operationId: publishRound
+      x-grpc: ConcertRound/PublishRound
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The Published round, content: { application/json: { schema: { $ref: '#/components/schemas/Round' } } } }
+        '400': { description: The round is not valid; details lists the problems, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/Unavailable' }
+
+  # ---------------------------------------------------------------- Table Availability Service: the polled read (ADR-09)
+  /api/rounds/{id}/table-status:
+    get:
+      tags: [Table Availability Service]
+      summary: The status of every table of a round, polled every 2 seconds; 304 when the version is unchanged (getRoundTableStatus)
+      operationId: getRoundTableStatus
+      x-grpc: TableAvailability/GetRoundTableStatus
+      x-roles: [customer, manager, front_staff, owner]
+      x-web-app: both
+      parameters:
+        - { $ref: '#/components/parameters/id' }
+        - { name: If-None-Match, in: header, schema: { type: string }, description: The version the caller already has }
+      responses:
+        '200':
+          description: The table map of the round
+          headers: { ETag: { schema: { type: string }, description: The version of the map } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/RoundTableStatus' } } }
+        '304': { description: Unchanged since the version in If-None-Match }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- Booking Service: the customer flow (UC-01, UC-09)
+  /api/bookings:
+    post:
+      tags: [Booking Service]
+      summary: Hold a table; first lock wins (createHeldBooking)
+      operationId: createHeldBooking
+      x-grpc: Bookings/CreateHeldBooking
+      x-roles: [customer]
+      x-web-app: customer
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [roundId, tableNumber], properties: { roundId: { type: string }, tableNumber: { type: integer } } } } } }
+      responses:
+        '200': { description: The Held booking with its remaining hold seconds, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The round is not open or the table was just taken by another customer (UC-01 AF-3), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/bookings/{id}:
+    get:
+      tags: [Booking Service]
+      summary: Read one of the caller's bookings (getBooking)
+      operationId: getBooking
+      x-grpc: Bookings/GetBooking
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The booking, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/bookings/{id}/party-size:
+    put:
+      tags: [Booking Service]
+      summary: Set the party size; the full table fee is computed in the same call (setPartySize)
+      operationId: setPartySize
+      x-grpc: Bookings/SetPartySize
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [partySize], properties: { partySize: { type: integer, minimum: 1 } } } } } }
+      responses:
+        '200': { description: The booking with its fee, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/bookings/{id}/terms:
+    get:
+      tags: [Booking Service]
+      summary: The booking terms with the check-in window of the round (getBookingTerms)
+      operationId: getBookingTerms
+      x-grpc: Bookings/GetBookingTerms
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The terms, content: { application/json: { schema: { $ref: '#/components/schemas/BookingTerms' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/bookings/{id}/terms-acceptance:
+    post:
+      tags: [Booking Service]
+      summary: Accept the booking terms (acceptBookingTerms)
+      operationId: acceptBookingTerms
+      x-grpc: Bookings/AcceptBookingTerms
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The booking with termsAccepted, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/bookings/{id}/payment:
+    post:
+      tags: [Booking Service]
+      summary: Start the payment of the full table fee, UC-10 (startPayment); 501 in Increment 1
+      operationId: startPayment
+      x-grpc: Bookings/StartPayment
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The payment request with the checkout URL, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentRequest' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+  /api/bookings/{id}/cancel:
+    post:
+      tags: [Booking Service]
+      summary: Cancel a Held booking; the table is released at once (cancelBooking)
+      operationId: cancelBooking
+      x-grpc: Bookings/CancelBooking
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The Cancelled booking, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/bookings/{id}/e-ticket:
+    get:
+      tags: [Booking Service]
+      summary: The e-ticket of a Confirmed booking (getETicket); 501 in progress 1
+      operationId: getETicket
+      x-grpc: Bookings/GetETicket
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The e-ticket, content: { application/json: { schema: { $ref: '#/components/schemas/ETicket' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+  /api/customers/me:
+    get:
+      tags: [Booking Service]
+      summary: The caller's customer profile; 404 before the first booking (getCustomerProfile)
+      operationId: getCustomerProfile
+      x-grpc: Bookings/GetCustomerProfile
+      x-roles: [customer]
+      x-web-app: customer
+      responses:
+        '200': { description: The profile, content: { application/json: { schema: { $ref: '#/components/schemas/CustomerProfile' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Booking Service]
+      summary: Create the profile with consent, UC-09 (createCustomerProfile)
+      operationId: createCustomerProfile
+      x-grpc: Bookings/CreateCustomerProfile
+      x-roles: [customer]
+      x-web-app: customer
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CustomerProfileCreate' } } } }
+      responses:
+        '200': { description: The profile, content: { application/json: { schema: { $ref: '#/components/schemas/CustomerProfile' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    put:
+      tags: [Booking Service]
+      summary: Correct the profile; a field left out is unchanged (updateCustomerProfile)
+      operationId: updateCustomerProfile
+      x-grpc: Bookings/UpdateCustomerProfile
+      x-roles: [customer]
+      x-web-app: customer
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CustomerProfileUpdate' } } } }
+      responses:
+        '200': { description: The profile, content: { application/json: { schema: { $ref: '#/components/schemas/CustomerProfile' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/customers/me/bookings:
+    get:
+      tags: [Booking Service]
+      summary: My Bookings, UC-06 (getCustomerBookings)
+      operationId: getCustomerBookings
+      x-grpc: Bookings/GetCustomerBookings
+      x-roles: [customer]
+      x-web-app: customer
+      responses:
+        '200': { description: The caller's bookings, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---------------------------------------------------------------- Booking Service: the staff flows (UC-02, UC-05)
+  /api/check-ins/verify:
+    post:
+      tags: [Booking Service]
+      summary: Verify a scanned booking reference, UC-02 S-1 (verifyBookingReference); 501 in progress 1
+      operationId: verifyBookingReference
+      x-grpc: Bookings/VerifyBookingReference
+      x-roles: [front_staff, manager]
+      x-web-app: back-office
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingReference' } } } }
+      responses:
+        '200': { description: The verification result, content: { application/json: { schema: { $ref: '#/components/schemas/VerificationResult' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+  /api/check-ins:
+    post:
+      tags: [Booking Service]
+      summary: Confirm the entry; the booking becomes Checked-in (checkInBooking); 501 in progress 1
+      operationId: checkInBooking
+      x-grpc: Bookings/CheckInBooking
+      x-roles: [front_staff, manager]
+      x-web-app: back-office
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BookingReference' } } } }
+      responses:
+        '200': { description: The Checked-in booking, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+  /api/rounds/{id}/bookings:
+    get:
+      tags: [Booking Service]
+      summary: The bookings of a round for the live view, UC-05 (getRoundBookings)
+      operationId: getRoundBookings
+      x-grpc: Bookings/GetRoundBookings
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The bookings, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---------------------------------------------------------------- Payment Service (MVP contract)
+  /api/payments/webhook:
+    post:
+      tags: [Payment Service]
+      summary: The signed payment result of the Payment Gateway (receivePaymentResult); no session, the signature authenticates it (NFR-38)
+      operationId: receivePaymentResult
+      x-grpc: Payment/ReceivePaymentResult
+      x-roles: []
+      x-web-app: payment-gateway
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentResult' } } } }
+      responses:
+        '200': { description: Accepted; a duplicate result is ignored, content: { application/json: { schema: { type: object, properties: { accepted: { type: boolean } } } } } }
+        '400': { description: The signature does not verify, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/payments/{id}:
+    get:
+      tags: [Payment Service]
+      summary: The status of a payment (getPaymentStatus)
+      operationId: getPaymentStatus
+      x-grpc: Payment/GetPaymentStatus
+      x-roles: [customer]
+      x-web-app: customer
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The payment, content: { application/json: { schema: { $ref: '#/components/schemas/PaymentStatus' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------- Staff Account Service (MVP contract, UC-08)
+  /api/sessions:
+    post:
+      tags: [Staff Account Service]
+      summary: Sign in a staff account (signIn)
+      operationId: signIn
+      x-grpc: StaffAccounts/SignIn
+      x-roles: []
+      x-web-app: back-office
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [username, password], properties: { username: { type: string }, password: { type: string, format: password } } } } } }
+      responses:
+        '200': { description: The session token and the role, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { description: Wrong username or password, or a disabled account, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/sessions/current:
+    delete:
+      tags: [Staff Account Service]
+      summary: Sign out (signOut); the token comes from the Authorization header, "Bearer <token>"
+      operationId: signOut
+      x-grpc: StaffAccounts/SignOut
+      x-roles: [manager, front_staff, owner]
+      x-web-app: back-office
+      parameters:
+        - { name: Authorization, in: header, schema: { type: string }, description: Bearer <session token> }
+      responses:
+        '200': { description: Signed out }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/staff-accounts:
+    get:
+      tags: [Staff Account Service]
+      summary: List the staff accounts (listStaffAccounts)
+      operationId: listStaffAccounts
+      x-grpc: StaffAccounts/ListStaffAccounts
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      responses:
+        '200': { description: The accounts, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/StaffAccount' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Staff Account Service]
+      summary: Create a staff account (createStaffAccount)
+      operationId: createStaffAccount
+      x-grpc: StaffAccounts/CreateStaffAccount
+      x-roles: [manager]
+      x-web-app: back-office
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StaffAccountCreate' } } } }
+      responses:
+        '200': { description: The account, content: { application/json: { schema: { $ref: '#/components/schemas/StaffAccount' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/staff-accounts/{id}:
+    put:
+      tags: [Staff Account Service]
+      summary: Change the role or the password of a staff account (updateStaffAccount)
+      operationId: updateStaffAccount
+      x-grpc: StaffAccounts/UpdateStaffAccount
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StaffAccountUpdate' } } } }
+      responses:
+        '200': { description: The account, content: { application/json: { schema: { $ref: '#/components/schemas/StaffAccount' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Staff Account Service]
+      summary: Disable a staff account; it can no longer sign in (disableStaffAccount)
+      operationId: disableStaffAccount
+      x-grpc: StaffAccounts/DisableStaffAccount
+      x-roles: [manager]
+      x-web-app: back-office
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: The Disabled account, content: { application/json: { schema: { $ref: '#/components/schemas/StaffAccount' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    userId: { type: apiKey, in: header, name: x-user-id, description: Progress 1 fake authentication, the caller's identity }
+    role: { type: apiKey, in: header, name: x-role, description: Progress 1 fake authentication, customer | manager | front_staff | owner }
+  parameters:
+    id: { name: id, in: path, required: true, schema: { type: string } }
+  responses:
+    BadRequest: { description: Invalid input; details may list the problems, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: No identity, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: The role may not call this route (FR-66), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: A rule refuses the change, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotImplemented: { description: Not built in this increment, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unavailable: { description: The service or one of its collaborators is down, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Removed: { description: Removed, content: { application/json: { schema: { type: object, properties: { removed: { type: boolean } } } } } }
+    ValidationResult: { description: The validation result, content: { application/json: { schema: { $ref: '#/components/schemas/ValidationResult' } } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        details: { description: The service's detail of the error, for example the problems of a validation }
+    TableTypeInput:
+      type: object
+      required: [name, capacity]
+      properties:
+        name: { type: string }
+        capacity: { type: integer, minimum: 1 }
+        packageContent: { type: string }
+    TableType:
+      allOf:
+        - { type: object, required: [id], properties: { id: { type: string } } }
+        - { $ref: '#/components/schemas/TableTypeInput' }
+    BusinessParameters:
+      type: object
+      properties:
+        holdPeriodMinutes: { type: integer, description: BRULE-02 }
+        checkInWindowHours: { type: integer, description: BRULE-04 }
+        gracePeriodMinutes: { type: integer, description: BRULE-05 }
+        extraPersonFee: { type: integer, description: THB per person above the capacity of the table type, BRULE-09 }
+    BusinessParametersUpdate:
+      $ref: '#/components/schemas/BusinessParameters'
+    Zone:
+      type: object
+      properties: { id: { type: string }, name: { type: string } }
+    ZoneMapTable:
+      type: object
+      properties:
+        tableNumber: { type: integer, description: unique in the map (FR-74) }
+        zoneId: { type: string }
+        tableTypeId: { type: string }
+        capacity: { type: integer }
+        x: { type: integer }
+        y: { type: integer }
+    ZoneSummary:
+      type: object
+      properties: { zoneId: { type: string }, name: { type: string }, tables: { type: integer }, capacity: { type: integer } }
+    ZoneMap:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { type: string, enum: [Draft, Active] }
+        imageUrl: { type: string }
+        zones: { type: array, items: { $ref: '#/components/schemas/Zone' } }
+        tables: { type: array, items: { $ref: '#/components/schemas/ZoneMapTable' } }
+        createdAt: { type: string, format: date-time }
+        summary: { type: array, items: { $ref: '#/components/schemas/ZoneSummary' }, description: tables and capacity per zone }
+    ZoneMapSummary:
+      type: object
+      properties: { id: { type: string }, name: { type: string }, status: { type: string, enum: [Draft, Active] }, tables: { type: integer } }
+    ZoneMapUpdate:
+      type: object
+      description: A field left out is unchanged
+      properties:
+        name: { type: string }
+        zones: { type: array, items: { $ref: '#/components/schemas/Zone' } }
+        tables: { type: array, items: { $ref: '#/components/schemas/ZoneMapTable' } }
+    ValidationResult:
+      type: object
+      properties: { valid: { type: boolean }, problems: { type: array, items: { type: string } } }
+    PackagePrice:
+      type: object
+      properties:
+        zoneId: { type: string }
+        tableTypeId: { type: string }
+        packagePrice: { type: integer, description: THB (BRULE-08) }
+        packageContent: { type: string }
+    CheckInWindow:
+      type: object
+      properties:
+        roundId: { type: string }
+        opensAt: { type: string, format: date-time, description: start minus the check-in window (BRULE-04) }
+        startAt: { type: string, format: date-time }
+        graceEndsAt: { type: string, format: date-time, description: start plus the grace period (BRULE-05) }
+    RoundTable:
+      type: object
+      description: A table of the round, the map joined with its table type and package price
+      properties:
+        tableNumber: { type: integer }
+        zoneId: { type: string }
+        zoneName: { type: string }
+        tableTypeId: { type: string }
+        tableTypeName: { type: string }
+        capacity: { type: integer }
+        x: { type: integer }
+        y: { type: integer }
+        forSale: { type: boolean }
+        packagePrice: { type: integer, description: absent until the round prices this zone and type }
+        packageContent: { type: string }
+    Round:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        artist: { type: string }
+        status: { type: string, enum: [Draft, Published] }
+        date: { type: string, format: date, description: venue local date }
+        doorsOpenAt: { type: string, format: date-time }
+        startAt: { type: string, format: date-time }
+        bookingOpenAt: { type: string, format: date-time, description: BRULE-07 }
+        zoneMapId: { type: string }
+        tablesNotForSale: { type: array, items: { type: integer } }
+        prices: { type: array, items: { $ref: '#/components/schemas/PackagePrice' } }
+        checkInWindow: { allOf: [{ $ref: '#/components/schemas/CheckInWindow' }], nullable: true, description: null until the round has a start time }
+        parameters: { allOf: [{ $ref: '#/components/schemas/BusinessParameters' }], nullable: true, description: snapshot at publish, the values in force for this round (FR-38) }
+        createdAt: { type: string, format: date-time }
+        holdPeriodMinutes: { type: integer, description: in force for this round (BRULE-02) }
+        tables: { type: array, items: { $ref: '#/components/schemas/RoundTable' } }
+        confirmedBookings: { type: integer, description: after a change to a Published round, the bookings that keep their table (UC-03 AF-3) }
+    RoundUpdate:
+      type: object
+      description: A field left out is unchanged
+      properties:
+        name: { type: string }
+        artist: { type: string }
+        date: { type: string, format: date }
+        doorsOpenAt: { type: string, format: date-time }
+        startAt: { type: string, format: date-time }
+        bookingOpenAt: { type: string, format: date-time }
+        zoneMapId: { type: string }
+        tablesNotForSale: { type: array, items: { type: integer } }
+        prices: { type: array, items: { $ref: '#/components/schemas/PackagePrice' } }
+    UpcomingRound:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        artist: { type: string }
+        date: { type: string, format: date }
+        startAt: { type: string, format: date-time }
+        bookingOpenAt: { type: string, format: date-time }
+        status: { type: string, enum: [not yet open, open, sold out] }
+        availableTables: { type: integer }
+        tablesForSale: { type: integer }
+    TableStatus:
+      type: object
+      properties:
+        tableNumber: { type: integer }
+        status: { type: string, enum: [AVAILABLE, HELD, BOOKED, OCCUPIED, NOT_FOR_SALE] }
+        bookingId: { type: string, description: empty when free }
+        holdEndsAt: { type: string, description: RFC 3339, empty unless HELD }
+    RoundTableStatus:
+      type: object
+      description: The read model of the table map (ADR-13)
+      properties:
+        roundId: { type: string }
+        version: { type: integer, description: grows on every change; the ETag of the polled read (ADR-09) }
+        tables: { type: array, items: { $ref: '#/components/schemas/TableStatus' } }
+    Fee:
+      type: object
+      properties:
+        packagePrice: { type: integer, description: BRULE-08 }
+        extraPersons: { type: integer }
+        extraPersonFee: { type: integer, description: BRULE-09 }
+        fullTableFee: { type: integer, description: BRULE-01 }
+    StatusChange:
+      type: object
+      description: One transition of the booking, its audit trail (ADR-13)
+      properties: { status: { type: string }, at: { type: string, format: date-time }, by: { type: string } }
+    Booking:
+      type: object
+      properties:
+        id: { type: string }
+        customerId: { type: string, description: LINE user id (BRULE-12) }
+        roundId: { type: string }
+        tableNumber: { type: integer }
+        zoneId: { type: string, description: copied from the round at hold time (BRULE-07) }
+        zoneName: { type: string }
+        tableTypeId: { type: string }
+        capacity: { type: integer }
+        status: { type: string, enum: [Held, Confirmed, Checked-in, Cancelled, Expired, No-show] }
+        holdEndsAt: { type: string, format: date-time, description: BRULE-02 }
+        partySize: { type: integer, description: absent until set }
+        fee: { allOf: [{ $ref: '#/components/schemas/Fee' }], nullable: true }
+        termsAccepted: { type: boolean, description: BRULE-16 }
+        createdAt: { type: string, format: date-time }
+        history: { type: array, items: { $ref: '#/components/schemas/StatusChange' } }
+        remainingHoldSeconds: { type: integer, description: 0 unless Held }
+    CustomerProfileCreate:
+      type: object
+      required: [name, phone, consent]
+      properties:
+        name: { type: string }
+        phone: { type: string, description: Thai mobile number, 10 digits starting with 06, 08 or 09 }
+        consent: { type: boolean, description: PDPA consent to the data collection (FR-10, BRULE-11) }
+    CustomerProfileUpdate:
+      type: object
+      properties: { name: { type: string }, phone: { type: string } }
+    CustomerProfile:
+      type: object
+      properties: { customerId: { type: string }, name: { type: string }, phone: { type: string }, consentAt: { type: string, format: date-time } }
+    BookingTerms:
+      type: object
+      properties:
+        bookingId: { type: string }
+        terms: { type: array, items: { type: string } }
+        checkInWindow: { $ref: '#/components/schemas/CheckInWindow' }
+    PaymentRequest:
+      type: object
+      properties: { paymentId: { type: string }, checkoutUrl: { type: string, format: uri, description: the hosted checkout of the Payment Gateway } }
+    ETicket:
+      type: object
+      properties: { bookingId: { type: string }, bookingReference: { type: string }, qrPayload: { type: string, description: the signed booking reference } }
+    BookingReference:
+      type: object
+      required: [bookingReference]
+      properties: { bookingReference: { type: string } }
+    VerificationResult:
+      type: object
+      properties:
+        valid: { type: boolean }
+        booking: { allOf: [{ $ref: '#/components/schemas/Booking' }], nullable: true }
+        reason: { type: string, description: why the ticket is not valid (UC-02 EF-1, EF-2, AF-3, AF-5) }
+    PaymentResult:
+      type: object
+      required: [paymentId, status, amount, signature]
+      description: The signed result that the Payment Gateway posts (NFR-38)
+      properties:
+        paymentId: { type: string }
+        status: { type: string, enum: [Paid, Failed] }
+        amount: { type: integer }
+        signature: { type: string }
+    PaymentStatus:
+      type: object
+      properties:
+        paymentId: { type: string }
+        bookingId: { type: string }
+        status: { type: string, enum: [Pending, Paid, Failed] }
+        amount: { type: integer }
+    Session:
+      type: object
+      properties:
+        token: { type: string }
+        role: { type: string, enum: [manager, front_staff, owner] }
+        staffAccountId: { type: string }
+    StaffAccountCreate:
+      type: object
+      required: [username, role, password]
+      properties:
+        username: { type: string }
+        role: { type: string, enum: [manager, front_staff, owner] }
+        password: { type: string, format: password }
+    StaffAccountUpdate:
+      type: object
+      description: A field left out is unchanged
+      properties:
+        role: { type: string, enum: [manager, front_staff, owner] }
+        password: { type: string, format: password }
+    StaffAccount:
+      type: object
+      properties:
+        staffAccountId: { type: string }
+        username: { type: string }
+        role: { type: string, enum: [manager, front_staff, owner] }
+        status: { type: string, enum: [Active, Disabled] }

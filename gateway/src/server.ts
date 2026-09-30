@@ -1,8 +1,9 @@
 // API Gateway: the only REST API of SEATS (ADR-12). Fake auth (progress 1), role check per route (FR-66), then one
 // gRPC call to the owning service: path, query and JSON body in, JSON out, gRPC status mapped to an HTTP status.
+// A route with auth 'none' (sign-in, the payment webhook) skips the headers and the role check.
 import express, { type Request, type Response } from 'express';
 import grpc from '@grpc/grpc-js';
-import { DEADLINE_MS, healthOf } from './clients.js';
+import { ADDRESSES, DEADLINE_MS, healthOf } from './clients.js';
 import { ROUTES, type Role, type Route } from './routes.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -27,16 +28,18 @@ app.get('/health', async (_req, res) => {
 });
 
 const handle = (route: Route) => async (req: Request, res: Response) => {
-  const userId = req.get('x-user-id');
-  const role = req.get('x-role') as Role | undefined;
-  if (!userId || !role) { res.status(401).json({ error: 'x-user-id and x-role headers are required (fake auth, progress 1)' }); return; }
-  if (!route.roles.includes(role)) { res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
+  const userId = req.get('x-user-id') ?? '';
+  const role = (req.get('x-role') ?? '') as Role | '';
+  if (route.auth !== 'none') {
+    if (!userId || !role) { res.status(401).json({ error: 'x-user-id and x-role headers are required (fake auth, progress 1)' }); return; }
+    if (!route.roles.includes(role)) { res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
+  }
   const metadata = new grpc.Metadata();
-  metadata.set('x-user-id', userId);
-  metadata.set('x-role', role);
+  if (userId) metadata.set('x-user-id', userId);
+  if (role) metadata.set('x-role', role);
   const started = Date.now();
   try {
-    const request = route.request({ params: req.params as Record<string, string>, query: req.query as Record<string, string | undefined>, body: req.body ?? {} });
+    const request = route.request({ params: req.params as Record<string, string>, query: req.query as Record<string, string | undefined>, body: req.body ?? {}, header: (name) => req.get(name) });
     const out = await unary<any>((cb) => route.call(request, metadata, { deadline: Date.now() + DEADLINE_MS }, cb));
     const etag = route.etag?.(out);
     if (etag !== undefined && req.get('if-none-match') === etag) { log(req, route, 304, started, role, userId); res.status(304).end(); return; }
@@ -54,9 +57,9 @@ const handle = (route: Route) => async (req: Request, res: Response) => {
 };
 
 const log = (req: Request, route: Route, status: number, started: number, role: string, userId: string, note?: string) =>
-  console.log(`[gateway] ${role}:${userId} ${req.method} ${req.originalUrl} -> gRPC ${route.label} ${status} (${Date.now() - started} ms)${note ? ` ${note}` : ''}`);
+  console.log(`[gateway] ${role || 'anonymous'}:${userId || '-'} ${req.method} ${req.originalUrl} -> gRPC ${route.label} ${status} (${Date.now() - started} ms)${note ? ` ${note}` : ''}`);
 
 for (const route of ROUTES) app[route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete'](route.path, handle(route));
 app.use((req, res) => { res.status(404).json({ error: `no route for ${req.method} ${req.path}` }); });
 
-app.listen(PORT, () => console.log(`[gateway] REST on :${PORT}, gRPC to ${ROUTES.length} routes of three services`));
+app.listen(PORT, () => console.log(`[gateway] REST on :${PORT}, gRPC to ${ROUTES.length} routes of ${Object.keys(ADDRESSES).length} services`));

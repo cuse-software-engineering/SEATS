@@ -18,3 +18,8 @@ export function collection<T>(name: string): Collection<T> {
     list: () => [...m.values()],
   };
 }
+
+/** Empties every collection; the unit tests call it before each case. */
+export function resetStore(): void {
+  for (const m of collections.values()) m.clear();
+}

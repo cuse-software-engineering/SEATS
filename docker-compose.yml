@@ -1,5 +1,6 @@
 # Local deployment of the MVP services (Deliverable 3). `docker compose up --build`, then demo/rest-demo.sh.
-# Ports: gateway REST 4000 (the only REST API, ADR-12); gRPC: concert-round 5001, booking 5002, table-availability 5003.
+# Ports: gateway REST 4000 (the only REST API, ADR-12); gRPC: concert-round 5001, booking 5002, table-availability 5003,
+# payment 5004, notification 5005, staff-account 5006.
 services:
   gateway:
     build: { context: ., args: { SERVICE: gateway } }
@@ -8,7 +9,10 @@ services:
       CONCERT_ROUND_GRPC: concert-round:5001
       BOOKING_GRPC: booking:5002
       TABLE_AVAILABILITY_GRPC: table-availability:5003
-    depends_on: [concert-round, booking, table-availability]
+      PAYMENT_GRPC: payment:5004
+      NOTIFICATION_GRPC: notification:5005
+      STAFF_ACCOUNT_GRPC: staff-account:5006
+    depends_on: [concert-round, booking, table-availability, payment, notification, staff-account]
   concert-round:
     build: { context: ., args: { SERVICE: services/concert-round } }
     ports: ["5001:5001"]
@@ -23,5 +27,14 @@ services:
     environment:
       CONCERT_ROUND_GRPC: concert-round:5001
       TABLE_AVAILABILITY_GRPC: table-availability:5003
+  payment:
+    build: { context: ., args: { SERVICE: services/payment } }
+    ports: ["5004:5004"]
+  notification:
+    build: { context: ., args: { SERVICE: services/notification } }
+    ports: ["5005:5005"]
+  staff-account:
+    build: { context: ., args: { SERVICE: services/staff-account } }
+    ports: ["5006:5006"]
   # MongoDB per service comes when a service swaps its in-memory store for Mongoose (ADR-06):
   # mongo-booking: { image: mongo:7, ports: ["27017:27017"] }
