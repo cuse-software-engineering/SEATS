@@ -1,0 +1,9 @@
+{
+  "name": "@seats/booking",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Booking Service: the booking from Held to Checked-in, customer profile, terms, e-ticket.",
+  "scripts": { "start": "node src/server.js" },
+  "dependencies": { "@grpc/grpc-js": "^1.12.0", "@grpc/proto-loader": "^0.7.13", "express": "^5.1.0" }
+}

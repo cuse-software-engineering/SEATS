@@ -1,0 +1,59 @@
+// SEATS — gRPC API of the Concert Round Service (project document Table 5.3, ADR-12).
+// Only the operations that OTHER SERVICES call are here; the back-office uses the REST API (docs/contracts.md).
+// Owner: Natchy. Changing a message here changes the Booking Service too: tell its owner.
+syntax = "proto3";
+
+package seats.concertround.v1;
+
+service ConcertRound {
+  rpc GetRound(GetRoundRequest) returns (Round);                        // Booking: is booking open? which tables?
+  rpc GetRoundPricing(GetRoundPricingRequest) returns (RoundPricing);   // Booking: calculateTableFee()
+  rpc GetCheckInWindow(GetCheckInWindowRequest) returns (CheckInWindow); // Booking: booking terms, ticket verification
+}
+
+message GetRoundRequest { string round_id = 1; }
+message GetRoundPricingRequest { string round_id = 1; }
+message GetCheckInWindowRequest { string round_id = 1; }
+
+message RoundTable {
+  int32 table_number = 1;
+  string zone_id = 2;
+  string zone_name = 3;
+  string table_type_id = 4;
+  int32 capacity = 5;
+  bool for_sale = 6;
+}
+
+message Round {
+  string round_id = 1;
+  string name = 2;
+  string artist = 3;
+  string status = 4;             // Draft | Published
+  string date = 5;               // YYYY-MM-DD, venue local time
+  string doors_open_at = 6;      // RFC 3339
+  string start_at = 7;           // RFC 3339
+  string booking_open_at = 8;    // RFC 3339 (BRULE-07)
+  string zone_map_id = 9;
+  int32 hold_period_minutes = 10; // business parameter in force for this round (FR-38, BRULE-02)
+  repeated RoundTable tables = 11;
+}
+
+message PackagePrice {
+  string zone_id = 1;
+  string table_type_id = 2;
+  int32 package_price = 3;       // THB (BRULE-08)
+  string package_content = 4;
+}
+
+message RoundPricing {
+  string round_id = 1;
+  repeated PackagePrice prices = 2;
+  int32 extra_person_fee = 3;    // THB per person above the table type's capacity (BRULE-09)
+}
+
+message CheckInWindow {
+  string round_id = 1;
+  string opens_at = 2;           // start − check-in window (2 h, BRULE-04)
+  string start_at = 3;
+  string grace_ends_at = 4;      // start + grace period (30 min, BRULE-05); after it the booking is a no-show
+}

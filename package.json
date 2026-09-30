@@ -1,0 +1,12 @@
+{
+  "name": "seats",
+  "private": true,
+  "description": "SEATS — Seating & Event Availability Tracking System. Microservices of the 2110521 group project (SE 101).",
+  "workspaces": ["gateway", "services/*"],
+  "scripts": {
+    "dev": "concurrently -n gateway,round,tables,booking -c green,magenta,cyan,yellow \"npm -w gateway start\" \"npm -w services/concert-round start\" \"npm -w services/table-availability start\" \"npm -w services/booking start\"",
+    "smoke": "node demo/smoke.mjs"
+  },
+  "devDependencies": { "concurrently": "^9.1.0" },
+  "engines": { "node": ">=20" }
+}

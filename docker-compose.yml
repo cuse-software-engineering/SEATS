@@ -1,0 +1,27 @@
+# Local deployment of the MVP services (Deliverable 3). `docker compose up --build`, then demo/rest-demo.sh.
+# Ports: gateway 4000; concert-round REST 4001 / gRPC 5001; booking REST 4002; table-availability REST 4003 / gRPC 5003.
+services:
+  gateway:
+    build: { context: ., args: { SERVICE: gateway } }
+    ports: ["4000:4000"]
+    environment:
+      CONCERT_ROUND_URL: http://concert-round:4001
+      BOOKING_URL: http://booking:4002
+      TABLE_AVAILABILITY_URL: http://table-availability:4003
+    depends_on: [concert-round, booking, table-availability]
+  concert-round:
+    build: { context: ., args: { SERVICE: services/concert-round } }
+    ports: ["4001:4001", "5001:5001"]
+    environment:
+      TABLE_AVAILABILITY_GRPC: table-availability:5003
+  table-availability:
+    build: { context: ., args: { SERVICE: services/table-availability } }
+    ports: ["4003:4003", "5003:5003"]
+  booking:
+    build: { context: ., args: { SERVICE: services/booking } }
+    ports: ["4002:4002"]
+    environment:
+      CONCERT_ROUND_GRPC: concert-round:5001
+      TABLE_AVAILABILITY_GRPC: table-availability:5003
+  # MongoDB per service comes when a service swaps its in-memory store for Mongoose (ADR-06):
+  # mongo-booking: { image: mongo:7, ports: ["27017:27017"] }

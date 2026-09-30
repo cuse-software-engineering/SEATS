@@ -1,0 +1,60 @@
+// SEATS — gRPC API of the Table Availability Service (project document Table 5.3, ADR-08, ADR-12).
+// The whole API of this service is gRPC (its only REST call is the polled read, docs/contracts.md).
+// It is the "gRPC service with CRUD" of Deliverable 3: C = InitializeRoundTableStatus, R = Get/Count,
+// U = HoldTable / ReleaseHold / MarkTableBooked / MarkTableOccupied, D = RemoveRoundTableStatus.
+// Owner: Will. Callers: Concert Round Service (publish, counts, booked tables) and Booking Service (holds).
+syntax = "proto3";
+
+package seats.tableavailability.v1;
+
+service TableAvailability {
+  rpc InitializeRoundTableStatus(InitializeRoundTableStatusRequest) returns (RoundTableStatus); // C, on publishRound()
+  rpc GetRoundTableStatus(RoundRef) returns (RoundTableStatus);                                   // R
+  rpc CountAvailableTables(CountAvailableTablesRequest) returns (CountAvailableTablesResponse);  // R, sold-out status
+  rpc HoldTable(HoldTableRequest) returns (TableStatus);       // U: AVAILABLE -> HELD, first lock wins (BRULE-03)
+  rpc ReleaseHold(TableRef) returns (TableStatus);             // U: HELD -> AVAILABLE, idempotent (ADR-08)
+  rpc MarkTableBooked(TableRef) returns (TableStatus);         // U: HELD -> BOOKED
+  rpc MarkTableOccupied(TableRef) returns (TableStatus);       // U: BOOKED -> OCCUPIED (check-in)
+  rpc RemoveRoundTableStatus(RoundRef) returns (RemoveRoundTableStatusResponse); // D, when a round is discarded
+}
+
+message RoundRef { string round_id = 1; }
+
+message TableRef {
+  string round_id = 1;
+  int32 table_number = 2;
+  string booking_id = 3;         // the booking that holds the table; a release with another id is refused
+}
+
+message InitialTable { int32 table_number = 1; bool for_sale = 2; }
+
+message InitializeRoundTableStatusRequest {
+  string round_id = 1;
+  repeated InitialTable tables = 2;
+}
+
+message CountAvailableTablesRequest { repeated string round_ids = 1; }
+message RoundCount { string round_id = 1; int32 available = 2; int32 for_sale = 3; }
+message CountAvailableTablesResponse { repeated RoundCount counts = 1; }
+
+message HoldTableRequest {
+  string round_id = 1;
+  int32 table_number = 2;
+  string booking_id = 3;
+  string hold_ends_at = 4;       // RFC 3339; the Booking Service owns the timer (ADR-08)
+}
+
+message TableStatus {
+  int32 table_number = 1;
+  string status = 2;             // AVAILABLE | HELD | BOOKED | OCCUPIED | NOT_FOR_SALE
+  string booking_id = 3;
+  string hold_ends_at = 4;
+}
+
+message RoundTableStatus {
+  string round_id = 1;
+  int64 version = 2;             // grows on every change; a poller that sends the same version gets 304 (ADR-09)
+  repeated TableStatus tables = 3;
+}
+
+message RemoveRoundTableStatusResponse { bool removed = 1; }
