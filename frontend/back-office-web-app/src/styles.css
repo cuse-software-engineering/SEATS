@@ -76,3 +76,5 @@ table.data td.tight { width: 1%; white-space: nowrap; }
 @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
 .viewfinder { height: 200px; border: 2px dashed var(--ink-3); border-radius: 8px; display: grid; place-items: center; color: var(--ink-3); text-align: center; padding: 12px; background: repeating-linear-gradient(0deg, #f8f8f8 0 10px, #f0f0f0 10px 20px); }
 .problems { margin: 6px 0 0 18px; padding: 0; }
+
+.build { margin: 24px 16px 12px; color: #9ca3af; font-size: 11px; text-align: center; }

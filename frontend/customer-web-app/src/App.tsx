@@ -19,6 +19,7 @@ export default function App() {
         </div>
       </header>
       <main className="page"><Outlet /></main>
+      <footer className="build" title="the commit this build was made from">build {__BUILD__.sha} · {__BUILD__.at}</footer>
     </>
   );
 }
