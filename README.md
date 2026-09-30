@@ -84,7 +84,19 @@ named by the flow they cover (`UC-01 AF-3 Table Just Taken by Another Customer`)
 ## Deploy
 
 The demo deployment is the monolith on a process host and the two web apps on Vercel; the microservices themselves are
-deployed with `docker-compose.yml`.
+deployed with `docker-compose.yml`. Live since 30 September 2026:
+
+| What | URL | Note |
+|---|---|---|
+| Backend (monolith on Render) | https://seats-monolith.onrender.com | `/health` lists the six services |
+| Customer Web App (Vercel) | https://seats-r94r.vercel.app | type any LINE user id on the first screen |
+| Back-office Web App (Vercel) | https://seats-kappa.vercel.app | sign in with `manager/manager` |
+
+The backend sleeps after 15 minutes without traffic and wakes up empty. **Before a demo**, wake and seed it once:
+
+```bash
+GATEWAY=https://seats-monolith.onrender.com npm run smoke   # table types, a zone map, a published round, two bookings
+```
 
 **Backend on Render** (free plan): New → Blueprint → this repository. `render.yaml` creates the web service
 `seats-monolith` from `Dockerfile.monolith`, which runs `monolith/src/server.ts` on the port Render gives it, with
