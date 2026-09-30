@@ -99,9 +99,9 @@ erDiagram
     }
 ```
 
-One document per round with its tables embedded, so `holdTable()` is one conditional update of one document
-(`findOneAndUpdate` with the expected status in the filter): exactly one of several concurrent holds succeeds (ADR-08,
-NFR-20). The gRPC messages are this model one to one.
+One document per round with its tables embedded: the read model of the table map (ADR-13). The Booking Service wins
+the hold in its own database and then reports each transition here; `holdTable()` is one conditional update of the
+document. The gRPC messages are this model one to one.
 
 ## Booking Service — Booking DB (owner: Peat SE)
 
@@ -139,8 +139,10 @@ erDiagram
     }
 ```
 
-The booking copies zone, table type and capacity from the round when the table is held, so that the fee and the ticket
-do not change if the map is edited later (BRULE-07). Progress 2 adds the e-ticket (signed booking reference), the
+The booking is the source of truth of the hold (ADR-13): a unique partial index on (`roundId`, `tableNumber`) where the
+status is active (Held, Confirmed, Checked-in) lets exactly one insert win (BRULE-03), and `history` records every
+transition. The booking copies zone, table type and capacity from the round when the table is held, so that the fee and
+the ticket do not change if the map is edited later (BRULE-07). Progress 2 adds the e-ticket (signed booking reference), the
 payment reference and the check-in record (time, staff account) to `BOOKING`.
 
 ## Not modelled yet

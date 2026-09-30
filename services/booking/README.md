@@ -1,7 +1,9 @@
 # Booking Service (owner: Peat SE)
 
 The booking context: the booking from Held to Checked-in, the customer profile, the booking terms and the e-ticket
-(Booking DB). REST :4002 for the customer flow through the gateway (route table in `docs/contracts.md`); gRPC client of
+(Booking DB). The booking is the source of truth of the hold: at most one active booking per table per round, enforced by
+a unique index (in memory: a check-and-insert), and every transition is appended to the booking's history (ADR-13); the
+Table Availability Service only keeps the read model. REST :4002 for the customer flow through the gateway (route table in `docs/contracts.md`); gRPC client of
 the Concert Round Service (GetRound, GetRoundPricing, GetCheckInWindow) and of the Table Availability Service
 (HoldTable, ReleaseHold, MarkTableBooked, MarkTableOccupied). Its own job expires unpaid holds every 5 s (ADR-08).
 

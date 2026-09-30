@@ -8,7 +8,7 @@ SVC=seats.tableavailability.v1.TableAvailability
 g() { grpcurl -plaintext -import-path proto -proto table_availability.proto -d "$2" "$ADDR" "$SVC/$1"; }
 step() { printf '\n\033[1;35m== %s\033[0m\n' "$*"; }
 
-step "C  InitializeRoundTableStatus"; g InitializeRoundTableStatus '{"round_id":"demo-round","tables":[{"table_number":1,"for_sale":true},{"table_number":2,"for_sale":true},{"table_number":3,"for_sale":false}]}'
+step "C  CreateRoundTableStatus"; g CreateRoundTableStatus '{"round_id":"demo-round","tables":[{"table_number":1,"for_sale":true},{"table_number":2,"for_sale":true},{"table_number":3,"for_sale":false}]}'
 step "R  GetRoundTableStatus";        g GetRoundTableStatus '{"round_id":"demo-round"}'
 step "R  CountAvailableTables";       g CountAvailableTables '{"round_ids":["demo-round","unknown"]}'
 step "U  HoldTable (first lock wins)"; g HoldTable '{"round_id":"demo-round","table_number":1,"booking_id":"b-1","hold_ends_at":"2026-10-03T20:15:00Z"}'

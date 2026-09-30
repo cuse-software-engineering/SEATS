@@ -2,13 +2,14 @@
 import { randomUUID } from 'node:crypto';
 import { collection } from './store.js';
 import { concertRound, tableAvailability, isGrpcError, GRPC_STATUS } from './clients.js';
-import type { Booking, BookingView, CustomerProfile } from './model.js';
+import type { Booking, BookingStatus, BookingView, CustomerProfile } from './model.js';
 
 export class DomainError extends Error {
   constructor(public readonly status: 400 | 404 | 409 | 501, message: string, public readonly details?: unknown) { super(message); }
 }
 
 const bookings = collection<Booking>('bookings');
+const ACTIVE: BookingStatus[] = ['Held', 'Confirmed', 'Checked-in'];   // the states that occupy a table (ADR-13)
 const profiles = collection<CustomerProfile>('profiles');   // keyed by the LINE user id
 
 const iso = (d: number | string | Date) => new Date(d).toISOString();
@@ -18,6 +19,13 @@ function requireOwnBooking(id: string, customerId: string): Booking {
   const b = bookings.get(id);
   if (!b || b.customerId !== customerId) throw new DomainError(404, `booking ${id} not found`);   // FR-40: own bookings only
   return b;
+}
+
+/** One transition, appended to the booking's history (ADR-13). */
+function transition(b: Booking, status: BookingStatus, by: string): Booking {
+  b.status = status;
+  b.history.push({ status, at: iso(Date.now()), by });
+  return bookings.put(b.id, b);
 }
 
 const view = (b: Booking): BookingView =>
@@ -32,14 +40,22 @@ export async function createHeldBooking(customerId: string, { roundId, tableNumb
   if (!table) throw new DomainError(404, `table ${tableNumber} is not for sale in this round`);
   const id = randomUUID();
   const holdEndsAt = iso(Date.now() + round.holdPeriodMinutes * 60e3);                       // BRULE-02
+  // First lock wins (BRULE-03, ADR-13): the booking is the truth. Node runs this check-and-insert without interleaving;
+  // with MongoDB it is the unique partial index on (roundId, tableNumber) where status is active, so exactly one of
+  // several concurrent inserts succeeds (NFR-20).
+  if (bookings.list().some((x) => x.roundId === roundId && x.tableNumber === tableNumber && ACTIVE.includes(x.status))) {
+    throw new DomainError(409, 'the table has just been taken by another customer');   // AF-3
+  }
+  const b: Booking = { id, customerId, roundId, tableNumber: tableNumber as number, zoneId: table.zoneId, zoneName: table.zoneName, tableTypeId: table.tableTypeId, capacity: table.capacity, status: 'Held', holdEndsAt, partySize: null, fee: null, termsAccepted: false, createdAt: iso(Date.now()), history: [{ status: 'Held', at: iso(Date.now()), by: customerId }] };
+  bookings.put(id, b);
   try {
-    await tableAvailability.holdTable({ roundId, tableNumber: tableNumber as number, bookingId: id, holdEndsAt });
+    await tableAvailability.holdTable({ roundId, tableNumber: tableNumber as number, bookingId: id, holdEndsAt });   // the read model follows
   } catch (e) {
-    if (isGrpcError(e, GRPC_STATUS.FAILED_PRECONDITION)) throw new DomainError(409, 'the table has just been taken by another customer');   // AF-3, first lock wins
+    bookings.delete(id);                                                                       // the projection refused: the map was out of step
+    if (isGrpcError(e, GRPC_STATUS.FAILED_PRECONDITION)) throw new DomainError(409, 'the table has just been taken by another customer');
     throw e;
   }
-  const b: Booking = { id, customerId, roundId, tableNumber: tableNumber as number, zoneId: table.zoneId, zoneName: table.zoneName, tableTypeId: table.tableTypeId, capacity: table.capacity, status: 'Held', holdEndsAt, partySize: null, fee: null, termsAccepted: false, createdAt: iso(Date.now()) };
-  return view(bookings.put(id, b));
+  return view(b);
 }
 
 export const getBooking = (id: string, customerId: string): BookingView => view(requireOwnBooking(id, customerId));   // UC-01 steps 9, 21
@@ -77,15 +93,15 @@ const validProfile = ({ name, phone }: { name?: string; phone?: string }): strin
   return problems;
 };
 
-export function createCustomerProfile(customerId: string, { name, phone, consent }: { name?: string; phone?: string; consent?: boolean }): CustomerProfile {   // UC-01 step 12a, AF-6, AF-7
+export function createCustomerProfile(customerId: string, { name, phone, consent }: { name?: string; phone?: string; consent?: boolean }): CustomerProfile {   // UC-09 steps 3–5, AF-1, AF-2
   if (profiles.get(customerId)) throw new DomainError(409, 'the profile exists: use updateCustomerProfile()');
-  if (consent !== true) throw new DomainError(400, 'the booking cannot continue without consent to the data collection');   // AF-6 is then cancelBooking()
+  if (consent !== true) throw new DomainError(400, 'the booking cannot continue without consent to the data collection');   // UC-09 AF-1; UC-01 AF-5 then cancels
   const problems = validProfile({ name, phone });
   if (problems.length) throw new DomainError(400, 'invalid profile', problems);
   return profiles.put(customerId, { customerId, name: (name as string).trim(), phone: phone as string, consentAt: iso(Date.now()) });
 }
 
-export function updateCustomerProfile(customerId: string, { name, phone }: { name?: string; phone?: string }): CustomerProfile {   // UC-01 step 12b
+export function updateCustomerProfile(customerId: string, { name, phone }: { name?: string; phone?: string }): CustomerProfile {   // UC-09 steps 6–7
   const p = getCustomerProfile(customerId);
   const next: CustomerProfile = { ...p, name: name ?? p.name, phone: phone ?? p.phone };
   const problems = validProfile(next);
@@ -125,9 +141,9 @@ export function startPayment(id: string, customerId: string): never {           
 export async function cancelBooking(id: string, customerId: string): Promise<BookingView> {          // UC-01 AF-4, AF-6
   const b = requireOwnBooking(id, customerId);
   if (b.status !== 'Held') throw new DomainError(409, `the booking is ${b.status}`);
-  await tableAvailability.releaseHold({ roundId: b.roundId, tableNumber: b.tableNumber, bookingId: b.id });
-  b.status = 'Cancelled';
-  return view(bookings.put(id, b));
+  transition(b, 'Cancelled', customerId);
+  await tableAvailability.releaseHold({ roundId: b.roundId, tableNumber: b.tableNumber, bookingId: b.id });   // the read model follows
+  return view(b);
 }
 
 export const getCustomerBookings = (customerId: string): BookingView[] => bookings.list().filter((b) => b.customerId === customerId).map(view);   // FR-40
@@ -137,8 +153,7 @@ export const getRoundBookings = (roundId: string): Booking[] => bookings.list().
 export async function expireUnpaidBookings(now = Date.now()): Promise<string[]> {
   const expired: string[] = [];
   for (const b of bookings.list().filter((b) => b.status === 'Held' && new Date(b.holdEndsAt).getTime() <= now)) {
-    b.status = 'Expired';
-    bookings.put(b.id, b);
+    transition(b, 'Expired', 'hold-expiry job');
     await tableAvailability.releaseHold({ roundId: b.roundId, tableNumber: b.tableNumber, bookingId: b.id })
       .catch((e: Error) => console.warn(`[booking] releaseHold retry later: ${e.message}`));
     console.log(`[booking] hold expired for booking ${b.id}; Notification Service sendHoldExpiredNotice() comes in progress 2`);

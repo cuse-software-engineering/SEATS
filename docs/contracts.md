@@ -33,7 +33,7 @@ Every REST call goes through the API Gateway, which strips `/api` and forwards t
 | createRound() | `POST /rounds` `{name?}` | new Draft round |
 | updateRound() | `PUT /rounds/:id` | Draft: any field, derives the check-in window; Published: only what AF-3 allows (BRULE-07) |
 | validateRound() | `POST /rounds/:id/validate` | UC-03 S-1 |
-| publishRound() | `POST /rounds/:id/publish` | snapshots the parameters; gRPC InitializeRoundTableStatus |
+| publishRound() | `POST /rounds/:id/publish` | snapshots the parameters; gRPC CreateRoundTableStatus |
 | discardDraftRound() | `DELETE /rounds/:id` | Draft only |
 | getUpcomingRounds() | `GET /rounds` | status not yet open / open / sold out (gRPC CountAvailableTables) |
 | getRound() | `GET /rounds/:id` | |
@@ -45,7 +45,7 @@ gRPC (`proto/concert_round.proto`): `GetRound`, `GetRoundPricing`, `GetCheckInWi
 
 ## Table Availability Service (gRPC :5003, REST :4003)
 
-gRPC (`proto/table_availability.proto`): `InitializeRoundTableStatus` (C), `GetRoundTableStatus`,
+gRPC (`proto/table_availability.proto`): `CreateRoundTableStatus` (C), `GetRoundTableStatus`,
 `CountAvailableTables` (R), `HoldTable`, `ReleaseHold`, `MarkTableBooked`, `MarkTableOccupied` (U),
 `RemoveRoundTableStatus` (D).
 
@@ -53,15 +53,16 @@ gRPC (`proto/table_availability.proto`): `InitializeRoundTableStatus` (C), `GetR
 |---|---|---|
 | getRoundTableStatus() | `GET /rounds/:id/table-status` | polled every 2 s by the web apps (ADR-09); `If-None-Match: <version>` gets 304 |
 
-Status values: `AVAILABLE`, `HELD`, `BOOKED`, `OCCUPIED`, `NOT_FOR_SALE`. `HoldTable` succeeds only from
-`AVAILABLE` (first lock wins, BRULE-03) and answers `FAILED_PRECONDITION` otherwise. `ReleaseHold` on an
-`AVAILABLE` table is a no-op (idempotent, ADR-08).
+Status values: `AVAILABLE`, `HELD`, `BOOKED`, `OCCUPIED`, `NOT_FOR_SALE`. The service keeps the read model of the
+table map (ADR-13): the Booking Service wins the hold in its own database (one active booking per table per round) and
+then reports it with `HoldTable`; a transition from the wrong state answers `FAILED_PRECONDITION`. `ReleaseHold` on an
+`AVAILABLE` table is a no-op (idempotent).
 
 ## Booking Service (REST :4002)
 
 | Operation (Table 5.3) | REST | Notes |
 |---|---|---|
-| createHeldBooking() | `POST /bookings` `{roundId, tableNumber}` | gRPC GetRound, HoldTable; 409 when just taken (AF-3) |
+| createHeldBooking() | `POST /bookings` `{roundId, tableNumber}` | gRPC GetRound; the hold is won in the Booking DB (ADR-13), then HoldTable updates the map; 409 when just taken (AF-3) |
 | getBooking() | `GET /bookings/:id` | own bookings only |
 | setPartySize() | `PUT /bookings/:id/party-size` `{partySize}` | computes the fee in the same request: gRPC GetRoundPricing (BRULE-08, BRULE-09) |
 | getCustomerProfile() | `GET /customers/me` | 404 on the first booking |

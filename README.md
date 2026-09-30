@@ -8,7 +8,7 @@ builds the MVP services of the two demo flows, **Create Zone Map + Create Round*
 |---|---|---|---|
 | API Gateway | `gateway/` | Will | REST :4000 (the only entry for the web apps; fake auth by headers) |
 | Concert Round Service | `services/concert-round/` | Natchy | REST :4001 (zone maps, table types, rounds, parameters) + gRPC :5001 |
-| Table Availability Service | `services/table-availability/` | Will | gRPC :5003 (CRUD on round table status) + REST :4003 (polled read) |
+| Table Availability Service | `services/table-availability/` | Will | gRPC :5003 (CRUD on the table-map read model, ADR-13) + REST :4003 (polled read) |
 | Booking Service | `services/booking/` | Peat SE | REST :4002 (customer flow) + gRPC client of the two above |
 | Demo scripts, smoke test | `demo/` | Peat CS | curl / grpcurl / node |
 | Contracts | `proto/`, `docs/contracts.md` | everyone, reviewed by Will | |

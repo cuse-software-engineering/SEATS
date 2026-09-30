@@ -13,9 +13,9 @@ export interface ProtoGrpcType {
       v1: {
         CountAvailableTablesRequest: MessageTypeDefinition
         CountAvailableTablesResponse: MessageTypeDefinition
+        CreateRoundTableStatusRequest: MessageTypeDefinition
         HoldTableRequest: MessageTypeDefinition
         InitialTable: MessageTypeDefinition
-        InitializeRoundTableStatusRequest: MessageTypeDefinition
         RemoveRoundTableStatusResponse: MessageTypeDefinition
         RoundCount: MessageTypeDefinition
         RoundRef: MessageTypeDefinition

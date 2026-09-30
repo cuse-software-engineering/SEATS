@@ -8,6 +8,9 @@ export interface Fee {
   fullTableFee: number;     // BRULE-01
 }
 
+/** One transition of a booking: its audit trail (ADR-13). */
+export interface StatusChange { status: BookingStatus; at: string; by: string }
+
 export interface Booking {
   id: string;
   customerId: string;       // LINE user id (BRULE-12)
@@ -23,6 +26,7 @@ export interface Booking {
   fee: Fee | null;
   termsAccepted: boolean;   // BRULE-16
   createdAt: string;
+  history: StatusChange[];  // appended on every transition
 }
 
 export interface CustomerProfile {

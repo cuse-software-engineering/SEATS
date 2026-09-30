@@ -22,7 +22,7 @@ const unary = <Req, Res>(fn: (req: Req) => Res): grpc.handleUnaryCall<Req, Res> 
 };
 
 const handlers: TableAvailabilityHandlers = {
-  InitializeRoundTableStatus: unary(domain.initializeRoundTableStatus),
+  CreateRoundTableStatus: unary(domain.createRoundTableStatus),
   GetRoundTableStatus: unary(domain.getRoundTableStatus),
   CountAvailableTables: unary(domain.countAvailableTables),
   HoldTable: unary(domain.holdTable),

@@ -227,7 +227,7 @@ export async function publishRound(id: string): Promise<Round> {                
   if (!v.valid) throw new DomainError(400, 'the round is not valid', v.problems);
   r.parameters = { ...getBusinessParameters() };                                                 // the values in force for this round (FR-38)
   r.checkInWindow = deriveCheckInWindow(r.startAt, r.parameters);
-  await tableAvailability.initializeRoundTableStatus({ roundId: id, tables: tablesOf(r).map((t) => ({ tableNumber: t.tableNumber, forSale: t.forSale })) });
+  await tableAvailability.createRoundTableStatus({ roundId: id, tables: tablesOf(r).map((t) => ({ tableNumber: t.tableNumber, forSale: t.forSale })) });
   r.status = 'Published';
   return rounds.put(id, r);
 }

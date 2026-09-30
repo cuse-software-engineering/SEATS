@@ -1,4 +1,6 @@
 // Table Availability Service — the operations of Table 5.3 (MVP), one function each. No transport code here.
+// The service keeps the read model of the table map (ADR-13): the Booking Service decides who holds a table and
+// reports each transition; the checks below only guard the projection against out-of-order updates.
 import { collection } from './store.js';
 import type { RoundCount, RoundTableStatus, RoundTableStatusView, TableStatus, TableStatusValue } from './model.js';
 
@@ -24,7 +26,7 @@ function requireTable(round: RoundTableStatus, tableNumber: number): TableStatus
 }
 
 /** C — called by publishRound(): every table for sale becomes AVAILABLE, the others NOT_FOR_SALE. Idempotent on retry (UC-03 EF-2). */
-export function initializeRoundTableStatus({ roundId, tables }: { roundId: string; tables: { tableNumber: number; forSale?: boolean }[] }): RoundTableStatusView {
+export function createRoundTableStatus({ roundId, tables }: { roundId: string; tables: { tableNumber: number; forSale?: boolean }[] }): RoundTableStatusView {
   if (!roundId || !tables?.length) throw new DomainError(400, 'roundId and tables are required');
   const existing = rounds.get(roundId);
   if (existing) return view(existing);
@@ -51,8 +53,8 @@ export function countAvailableTables({ roundIds }: { roundIds: string[] }): { co
   };
 }
 
-// One conditional check-and-set. Node runs it without interleaving; with MongoDB it is one findOneAndUpdate whose
-// filter carries the expected status, so exactly one of several concurrent callers succeeds (NFR-20).
+// One conditional update of the projection. The hold itself was already won in the Booking DB (unique index on the
+// active booking per table per round, ADR-13); a refused transition here means the projection is out of step.
 function transition(roundId: string, tableNumber: number, from: TableStatusValue[], to: TableStatusValue, patch: Partial<TableStatus>): TableStatus {
   const r = requireRound(roundId);
   const t = requireTable(r, tableNumber);
@@ -65,7 +67,7 @@ function transition(roundId: string, tableNumber: number, from: TableStatusValue
 
 interface TableRef { roundId: string; tableNumber: number; bookingId?: string }
 
-/** U — AVAILABLE -> HELD: first lock wins (BRULE-03, FR-08). The Booking Service owns the timer (ADR-08). */
+/** U — AVAILABLE -> HELD, reported by the Booking Service after it won the hold (BRULE-03, ADR-13). */
 export function holdTable({ roundId, tableNumber, bookingId, holdEndsAt }: TableRef & { holdEndsAt?: string }): TableStatus {
   if (!bookingId) throw new DomainError(400, 'bookingId is required');
   return transition(roundId, tableNumber, ['AVAILABLE'], 'HELD', { bookingId, holdEndsAt: holdEndsAt ?? '' });

@@ -27,7 +27,7 @@ step "Zone map: read (R) and list"
 curl -s "${MANAGER[@]}" $G/api/zone-maps/$MAP | jq -c '{name, status, zones: (.zones|length), tables: (.tables|length)}'
 curl -s "${MANAGER[@]}" "$G/api/zone-maps?status=Active" | jq -c .
 
-step "Round: create (C), update details, zone map and prices (U), validate, tables as the customer sees them, publish -> gRPC InitializeRoundTableStatus"
+step "Round: create (C), update details, zone map and prices (U), validate, tables as the customer sees them, publish -> gRPC CreateRoundTableStatus"
 ROUND=$(curl -s "${MANAGER[@]}" -X POST $G/api/rounds -d '{"name":"Friday Live"}' | jq -r .id); echo "round $ROUND"
 curl -s "${MANAGER[@]}" -X PUT $G/api/rounds/$ROUND -d "{\"artist\":\"The Band\",\"date\":\"$DAY\",\"doorsOpenAt\":\"${DAY}T18:00:00Z\",\"startAt\":\"${DAY}T20:00:00Z\",\"bookingOpenAt\":\"$OPEN\",\"zoneMapId\":\"$MAP\",\"tablesNotForSale\":[4],
   \"prices\":[{\"zoneId\":\"A\",\"tableTypeId\":\"sofa6\",\"packagePrice\":7200,\"packageContent\":\"2 bottles\"},{\"zoneId\":\"A\",\"tableTypeId\":\"round2\",\"packagePrice\":2400,\"packageContent\":\"1 bottle\"},{\"zoneId\":\"B\",\"tableTypeId\":\"round2\",\"packagePrice\":1800,\"packageContent\":\"1 bottle\"}]}" | jq -c '{status, checkInWindow}'

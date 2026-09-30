@@ -1,6 +1,7 @@
-// SEATS — gRPC API of the Table Availability Service (project document Table 5.3, ADR-08, ADR-12).
-// The whole API of this service is gRPC (its only REST call is the polled read, docs/contracts.md).
-// It is the "gRPC service with CRUD" of Deliverable 3: C = InitializeRoundTableStatus, R = Get/Count,
+// SEATS — gRPC API of the Table Availability Service (project document Table 5.3, ADR-12, ADR-13).
+// The service keeps the READ MODEL of the table map: the Booking Service owns the hold (one active booking per table
+// per round, ADR-13) and reports every transition here. The whole API is gRPC (the only REST call is the polled read).
+// It is the "gRPC service with CRUD" of Deliverable 3: C = CreateRoundTableStatus, R = Get/Count,
 // U = HoldTable / ReleaseHold / MarkTableBooked / MarkTableOccupied, D = RemoveRoundTableStatus.
 // Owner: Will. Callers: Concert Round Service (publish, counts, booked tables) and Booking Service (holds).
 syntax = "proto3";
@@ -8,10 +9,10 @@ syntax = "proto3";
 package seats.tableavailability.v1;
 
 service TableAvailability {
-  rpc InitializeRoundTableStatus(InitializeRoundTableStatusRequest) returns (RoundTableStatus); // C, on publishRound()
+  rpc CreateRoundTableStatus(CreateRoundTableStatusRequest) returns (RoundTableStatus);         // C, on publishRound()
   rpc GetRoundTableStatus(RoundRef) returns (RoundTableStatus);                                   // R
   rpc CountAvailableTables(CountAvailableTablesRequest) returns (CountAvailableTablesResponse);  // R, sold-out status
-  rpc HoldTable(HoldTableRequest) returns (TableStatus);       // U: AVAILABLE -> HELD, first lock wins (BRULE-03)
+  rpc HoldTable(HoldTableRequest) returns (TableStatus);       // U: AVAILABLE -> HELD, after the Booking Service won the hold
   rpc ReleaseHold(TableRef) returns (TableStatus);             // U: HELD -> AVAILABLE, idempotent (ADR-08)
   rpc MarkTableBooked(TableRef) returns (TableStatus);         // U: HELD -> BOOKED
   rpc MarkTableOccupied(TableRef) returns (TableStatus);       // U: BOOKED -> OCCUPIED (check-in)
@@ -28,7 +29,7 @@ message TableRef {
 
 message InitialTable { int32 table_number = 1; bool for_sale = 2; }
 
-message InitializeRoundTableStatusRequest {
+message CreateRoundTableStatusRequest {
   string round_id = 1;
   repeated InitialTable tables = 2;
 }
