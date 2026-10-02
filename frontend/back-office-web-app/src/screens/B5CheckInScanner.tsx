@@ -36,7 +36,7 @@ export default function B5CheckInScanner() {
       <h1>Check-in</h1>
       <ErrorAlert error={rounds.error} />
       <ErrorAlert error={bookings.error} />
-      <div className="card" style={{ maxWidth: 520 }}>
+      <div className="card">
         <label className="field">Round
           <select value={roundId} onChange={(e) => setRoundId(e.target.value)}>
             <option value="">— choose —</option>
