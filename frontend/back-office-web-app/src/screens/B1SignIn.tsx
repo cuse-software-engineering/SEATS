@@ -32,11 +32,13 @@ export default function B1SignIn() {
   };
 
   return (
-    <>
+    <div className="signin-page">
       <h1>Sign in</h1>
       {notice && <div className="notice">{notice}</div>}
       <ErrorAlert error={action.error} onClose={action.clear} />
-      <form className="card" onSubmit={signIn} style={{ maxWidth: 420 }}>
+      <form className="card" onSubmit={signIn} style={{ maxWidth: 525 }}>
+        <h2 style={{ margin: '0 0 4px' }}>Welcome back</h2>
+        <p className="muted small" style={{ margin: '0 0 20px' }}>Manage your tables, concert rounds, and check-ins — all in one place.</p>
         <label className="field">Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus /></label>
         <label className="field">Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></label>
         <div className="row">
@@ -46,7 +48,7 @@ export default function B1SignIn() {
         <p className="small muted">Progress 1 seeds manager/manager, door1/door1 (front staff) and owner/owner.</p>
       </form>
       {dev && (
-        <div className="card" style={{ maxWidth: 420 }}>
+        <div className="card" style={{ maxWidth: 525 }}>
           <h4>Dev sign-in (no Staff Account Service)</h4>
           <p className="small muted">Sets the session locally: the username above becomes <code>x-user-id</code>, the role <code>x-role</code>.</p>
           <label className="field">Role
@@ -55,6 +57,6 @@ export default function B1SignIn() {
           <button type="button" className="secondary" onClick={devSignIn}>Sign in locally as {role}</button>
         </div>
       )}
-    </>
+    </div>
   );
 }
