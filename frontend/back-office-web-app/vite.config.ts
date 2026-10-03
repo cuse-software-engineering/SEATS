@@ -15,6 +15,7 @@ export default defineConfig({
   server: {
     port: webAppPort('back-office'),
     strictPort: true,
+    host: true,   // every address, IPv4 included: a port forwarder (a Codespace, a container) connects over IPv4, and 'localhost' alone binds ::1 on Node 17+
     allowedHosts: forwarding ? [`.${forwarding}`] : undefined,
     proxy: { '/api': apiProxyTarget(), '/health': apiProxyTarget() },   // the API Gateway (the only REST API, ADR-12)
   },
