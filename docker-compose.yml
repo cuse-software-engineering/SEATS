@@ -18,6 +18,8 @@ services:
     ports: ["5001:5001"]
     environment:
       TABLE_AVAILABILITY_GRPC: table-availability:5003
+      CONCERT_ROUND_MONGO_URL: mongodb://mongo-concert-round:27017/concert-round
+    depends_on: [mongo-concert-round]
   table-availability:
     build: { context: ., args: { SERVICE: services/table-availability } }
     ports: ["5003:5003"]
@@ -36,5 +38,11 @@ services:
   staff-account:
     build: { context: ., args: { SERVICE: services/staff-account } }
     ports: ["5006:5006"]
-  # MongoDB per service comes when a service swaps its in-memory store for Mongoose (ADR-06):
+  mongo-concert-round:
+    image: mongo:7
+    volumes: ["mongo-concert-round-data:/data/db"]
+  # MongoDB per service comes when a service swaps its in-memory store for Mongoose (ADR-06); concert-round is first
+  # (above), the others still run in memory:
   # mongo-booking: { image: mongo:7, ports: ["27017:27017"] }
+volumes:
+  mongo-concert-round-data: {}
