@@ -13,7 +13,7 @@ each operation, and the properties the architecture promises. Everything runs on
 | Contract of the shared packages | `packages/*/test` | `npm test` (`TEST_MONGO_URL` adds MongoDB) | the repository contract against memory and MongoDB; the error mapping |
 | Scenario, in-process | `monolith/test/scenarios/uc-NN.test.ts` | `npm test` | the six services and the gateway in one process, calls through the Protocol Buffers serializers, in-memory databases, the fakes for external systems |
 | Scenario, over the network | the same files | `npm run test:api` with `GATEWAY` | a running system: microservice mode, docker compose, the monolith on MongoDB, or a deployment |
-| End to end | `frontend/e2e` | `npm run test:e2e` | the real screens against the in-process monolith |
+| End to end | `frontend/e2e` | `npm run test:e2e` | the real screens against the monolith: the use case flows (`uc-NN.spec.ts`, named as the document names them) and the feature suites (`customer-*`, `backoffice-*`), every step asserting the toast, dialog, field error or badge it produced |
 | End to end, deployed | the same files | `npm run test:e2e:deployed` with `DEMO_RESET_TOKEN` | the Vercel apps and the Render backend, emptied through the monolith's reset route before the run and seeded again after it |
 | Smoke | `demo/smoke.mjs` | `npm run smoke` | the demo flows against any gateway |
 

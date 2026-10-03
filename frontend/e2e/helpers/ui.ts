@@ -1,14 +1,15 @@
-// The steps every scenario shares, on the real screens: C1 login, C2 → C3, a tap on a table, B1 sign-in.
+// The steps every scenario shares, on the real screens: the LINE login, the round list → the table map, a tap on a
+// table, and the back-office sign-in.
 import { expect, type Locator, type Page } from '@playwright/test';
 
-/** "4,800 THB": money as the Customer Web App prints it (customer-web-app/src/format.ts). */
+/** "4,800 THB": money as the Customer Web App prints it (customer-web-app/src/app/format.ts). */
 export const thbText = (n: number): string => `${n.toLocaleString('en-US')} THB`;
 
 /** The start of a seeded round: 20:00Z of its day (helpers/seed.ts, seedRound). */
 export const startAtOf = (day: string): string => `${day}T20:00:00Z`;
 
 /** "Sat 26 Sep 2026 · 20:00": a round as the Customer Web App titles it, in this machine's time zone, the parts
- *  picked by hand as the app does (customer-web-app/src/format.ts, roundTitle). */
+ *  picked by hand as the app does (customer-web-app/src/app/format.ts, roundTitle). */
 export function roundTitle(startAt: string, year = true): string {
   const d = new Date(startAt);
   const p: Record<string, string> = {};
@@ -17,23 +18,31 @@ export function roundTitle(startAt: string, year = true): string {
   return `${p.weekday} ${p.day} ${p.month}${year ? ` ${p.year}` : ''} · ${clock}`;
 }
 
-/** C1 (UC-01 steps 1–2): the LINE Login dialog takes a LINE user id (the stub of progress 1); Allow then shows C2. */
+/** The message of the latest toast that says `text` (a substring); several toasts may be on screen at once, the
+ *  login's and then the hold's for instance, or the same message twice (a party size set, then set back), so the
+ *  match is by content and the newest wins. Assert the exact wording on it with toHaveText. */
+export const toastWith = (page: Page, text: string | RegExp): Locator => page.getByTestId('toast').filter({ hasText: text }).locator('span').last();
+
+/** The LINE Login dialog takes a LINE user id (the demo login); Allow then shows the concert rounds, the toast names
+ *  the customer and so does the footer. */
 export async function loginAsLineUser(page: Page, userId: string): Promise<void> {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'LINE Login' })).toBeVisible();
   await page.getByLabel('LINE user id').fill(userId);
   await page.getByRole('button', { name: 'Allow' }).click();
   await expect(page.getByRole('heading', { name: 'Concert rounds' })).toBeVisible();
+  await expect(toastWith(page, 'Logged in as')).toHaveText(`Logged in as ${userId}`);
   await expect(page.locator('.identity')).toHaveText(userId);   // the signed-in LINE user, in the build footer
 }
 
-/** C2: the card of a round. */
+/** The card of a round on the round list. */
 export const roundCard = (page: Page, roundId: string): Locator => page.locator(`[data-testid="round"][data-round="${roundId}"]`);
 
-/** C9: the card of a booking, by its round (one booking per round in every scenario). */
+/** The card of a booking on My bookings, by its round (one booking per round in every scenario that uses it). */
 export const bookingCard = (page: Page, roundId: string): Locator => page.locator(`[data-testid="booking"][data-round="${roundId}"]`);
 
-/** C2 → C3 (UC-01 steps 3–5): Select this round on its card and wait for the table map under the round's title. */
+/** Round list → table map (UC-01 steps 3–5): Select this round on its card and wait for the table map under the
+ *  round's title. */
 export async function openRound(page: Page, round: { id: string; date: string }): Promise<void> {
   await page.goto('/');
   const card = roundCard(page, round.id);
@@ -44,13 +53,15 @@ export async function openRound(page: Page, round: { id: string; date: string })
   await expect(page.getByTestId('table-map').getByRole('button', { name: /^table \d+, / }).first()).toBeVisible();
 }
 
-/** The table shape of C3 / B4 / the B3 preview: aria-label "table N, status". */
+/** The table shape of the map (customer and back-office alike): aria-label "table N, status". */
 export const tableButton = (page: Page, n: number, status: 'available' | 'held' | 'booked' | 'occupied' | 'not for sale'): Locator =>
   page.getByRole('button', { name: `table ${n}, ${status}`, exact: true });
 
-/** C3 → C4 (UC-01 steps 6–8): tap an available table; C4 shows the hold countdown in its app bar. */
+/** Table map → hold summary (UC-01 steps 6–8): tap an available table; the toast says the table is held and the
+ *  summary shows the hold countdown in its app bar. */
 export async function holdTable(page: Page, n: number): Promise<void> {
   await tableButton(page, n, 'available').click();
+  await expect(toastWith(page, 'is held for you')).toHaveText(/^Table [A-Z0-9]*\d+ is held for you for \d+ minutes$/);
   await expect(page.getByRole('heading', { name: 'Your table is held' })).toBeVisible();
   await expect(page.getByTestId('countdown')).toBeVisible();
 }

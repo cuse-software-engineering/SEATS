@@ -33,6 +33,8 @@ export interface RoundRepository {
   save(round: Round): Promise<Round>;
   /** Removes the round; true when it existed. */
   remove(id: string): Promise<boolean>;
+  /** Every round, Draft and Published (the back-office's list). */
+  all(): Promise<Round[]>;
   /** The Published rounds (the customer's list, the overlap check of validation). */
   published(): Promise<Round[]>;
   /** The Published rounds on this zone map (whose booked tables the map must keep). */

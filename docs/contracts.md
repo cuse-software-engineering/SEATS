@@ -17,6 +17,7 @@ never speaks REST, and a service never calls another service through the gateway
 | `POST`, `GET /api/zone-maps`; `GET`, `PUT`, `DELETE /api/zone-maps/:id`; `POST /api/zone-maps/:id/{image,validate,activate}` | ConcertRound/CreateZoneMap, ListZoneMaps, GetZoneMap, UpdateZoneMap, DiscardDraftZoneMap, UploadZoneMapImage, ValidateZoneMap, ActivateZoneMap | write: manager; read: manager, owner |
 | `POST /api/rounds`; `PUT`, `DELETE /api/rounds/:id`; `POST /api/rounds/:id/{validate,publish}` | ConcertRound/CreateRound, UpdateRound, DiscardDraftRound, ValidateRound, PublishRound | manager |
 | `GET /api/rounds`, `GET /api/rounds/:id`, `GET /api/rounds/:id/tables` | ConcertRound/GetUpcomingRounds, GetRound, GetRoundTables | everyone |
+| `GET /api/rounds/all` | ConcertRound/ListRounds (every round, Draft and Published, newest first) | manager, owner |
 | `GET /api/rounds/:id/table-status` | TableAvailability/GetRoundTableStatus | everyone; `If-None-Match: <version>` answers 304 |
 | `POST /api/bookings`; `GET /api/bookings/:id`; `PUT /api/bookings/:id/party-size`; `GET /api/bookings/:id/terms`; `POST /api/bookings/:id/{terms-acceptance,payment,cancel}`; `GET /api/bookings/:id/e-ticket` | Bookings/CreateHeldBooking, GetBooking, SetPartySize, GetBookingTerms, AcceptBookingTerms, StartPayment, CancelBooking, GetETicket | customer |
 | `GET`, `POST`, `PUT /api/customers/me`; `GET /api/customers/me/bookings` | Bookings/GetCustomerProfile, CreateCustomerProfile, UpdateCustomerProfile, GetCustomerBookings | customer |

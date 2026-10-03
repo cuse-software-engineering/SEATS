@@ -83,7 +83,7 @@ and `BACK_OFFICE_APP_URL`. `docker-compose.yml` sets the `*_GRPC` variables to t
 ```bash
 npm test                    # node:test: unit tests of every service, the in-process end-to-end flows and the use case scenarios
 npm run smoke               # the demo flows against the running gateway (npm run dev or dev:mono first): the wire-level check
-npm run test:e2e            # Playwright: the use case scenarios through the real screens (starts the servers it needs)
+npm run test:e2e            # Playwright: the use case flows and the feature suites through the real screens (starts the servers it needs)
 npm run test:e2e:deployed   # the same suite on the Vercel apps and the Render backend: reset, run, reset and seed again (DEMO_RESET_TOKEN=…)
 npm run test:api            # the same scenarios over the network against a running gateway (GATEWAY=…, default localhost:4000)
 npm run test:coverage       # the unit, contract and in-process scenario tests under Node's coverage, with thresholds

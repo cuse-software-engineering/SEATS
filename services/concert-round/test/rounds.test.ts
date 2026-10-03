@@ -468,6 +468,17 @@ describe('discardDraftRound', () => {
   });
 });
 
+describe('listRounds: the back-office list', () => {
+  test('answers every round, Draft and Published: a round without a date first, then the latest date first', async () => {
+    const map = await activeMap();
+    const later = await d.createRound({ name: 'later' }); await d.updateRound(later.id, fullRound(map, 9, PAST)); await d.publishRound(later.id);
+    const sooner = await d.createRound({ name: 'sooner' }); await d.updateRound(sooner.id, fullRound(map, 4, PAST));
+    const fresh = await d.createRound({ name: 'fresh draft' });
+    assert.deepEqual((await d.listRounds()).map((r) => [r.name, r.status]), [['fresh draft', 'Draft'], ['later', 'Published'], ['sooner', 'Draft']]);
+  });
+  test('is empty without a round', async () => { assert.deepEqual(await d.listRounds(), []); });
+});
+
 describe('getUpcomingRounds', () => {
   test('lists the published rounds in start order as not yet open, open or sold out', async () => {
     const map = await activeMap();

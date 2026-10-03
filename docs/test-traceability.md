@@ -52,7 +52,7 @@ the flow id and the flow's title, for example `UC-01 AF-3 Table Just Taken by An
 | UC-10 Pay the Full Table Fee | AF-1 Payment Declined | `uc-10.test.ts` (todo: payment is progress 2 (no payment request can be created, so the simulated gateway has nothing to decline)) | — | todo |
 | UC-10 Pay the Full Table Fee | EF-4 Hold Expires During Payment | `uc-10.test.ts` (todo: payment is progress 2 (the expiry itself is UC-01 EF-1, asserted in uc-01.test.ts)) | — | todo |
 
-**Summary**: 39 scenarios: 22 covered, 17 todo, 0 missing. Per use case (covered / todo / missing): UC-01 8 / 2 / 0, UC-02 0 / 9 / 0, UC-03 5 / 1 / 0, UC-04 6 / 1 / 0, UC-09 3 / 1 / 0, UC-10 0 / 3 / 0. Frontend tests found: 11.
+**Summary**: 39 scenarios: 22 covered, 17 todo, 0 missing. Per use case (covered / todo / missing): UC-01 8 / 2 / 0, UC-02 0 / 9 / 0, UC-03 5 / 1 / 0, UC-04 6 / 1 / 0, UC-09 3 / 1 / 0, UC-10 0 / 3 / 0. Frontend tests found: 34.
 
 Other tests named after a use case without a scenario id (progress 1 contract checks): `uc-02.test.ts` "UC-02 (progress 1) the check-in routes answer 501 and keep their role check"; `uc-10.test.ts` "UC-10 (progress 1) startPayment() needs the party size, the fee and the accepted terms, then answers 501"; `uc-08.spec.ts` "UC-08 Sign in and sign out".
 

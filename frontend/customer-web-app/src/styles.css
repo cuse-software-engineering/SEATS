@@ -1,110 +1,41 @@
-/* SEATS Customer Web App: the LIFF page inside LINE, laid out as the wireframes of Appendix D (status by pattern and
-   label, never by colour alone) with one accent colour on the actions and a tint per status. A phone-width column,
-   centered on a desktop. */
-:root { --accent: #2457c5; --accent-dark: #1c46a0; --accent-soft: #e8eefc; --line-green: #06c755; --amber: #b7791f; }
-* { box-sizing: border-box; }
-html, body { margin: 0; background: #e6e6e6; color: #222; font: 14px/1.35 system-ui, "Noto Sans", "Segoe UI", Roboto, "Liberation Sans", Arial, sans-serif; }
+/* SEATS Customer Web App: the shell of the LIFF page inside LINE, a phone-width column centered on a desktop. The
+   components (cards, buttons, fields, badges, the table map, toasts, the dialog) are styled by the shared kit
+   (frontend/shared/src/kit.css, imported once in main.tsx); here is only what belongs to this app: the column, the
+   app bar with its ⋮ menu, the LINE chat mock behind the login dialog, the footer and a few app-specific details. */
+html, body { margin: 0; background: #e6e6e6; color: var(--ink); font: 14px/1.35 system-ui, "Noto Sans", "Segoe UI", Roboto, "Liberation Sans", Arial, sans-serif; }
 #root { min-height: 100vh; }
 p { margin: 6px 0; }
 a { color: var(--accent-dark); }
-code { font-family: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace; font-size: 0.92em; }
 
 /* ── The column ── */
 .phone { max-width: 420px; min-height: 100vh; margin: 0 auto; background: #fff; display: flex; flex-direction: column; position: relative; }
 @media (min-width: 421px) { .phone { border-left: 1px solid #c8c8c8; border-right: 1px solid #c8c8c8; } }
 
 /* ── App bar ── */
-.appbar { height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #bbb; background: #f5f5f5; position: sticky; top: 0; z-index: 2; }
+.appbar { height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #bbb; background: var(--panel); position: sticky; top: 0; z-index: 2; }
 .appbar h1 { font-size: 16px; font-weight: 700; margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .appbar .back { font-size: 20px; color: #444; font-weight: 400; text-decoration: none; line-height: 1; flex: none; }
-.appbar .logo { flex: none; color: #222; margin-right: -2px; }
+.appbar .logo { flex: none; color: var(--ink); margin-right: -2px; }
 .appbar .avatar { width: 28px; height: 28px; border-radius: 50%; flex: none; }
 .appbar .right { margin-left: auto; flex: none; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .appbar .tiny { margin-left: 6px; }
 .appbar .menu { position: relative; flex: none; margin-right: -6px; }
 .appbar .more { border: 0; background: none; font: inherit; font-size: 22px; line-height: 1; padding: 4px 6px; color: #444; cursor: pointer; border-radius: 6px; }
 .appbar .more:hover, .appbar .more[aria-expanded="true"] { background: #e4e4e4; }
-.menu-list { position: absolute; right: 0; top: 36px; min-width: 200px; background: #fff; border: 1px solid #999; border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); z-index: 6; padding: 4px 0; }
-.menu-list a, .menu-list button { display: block; width: 100%; text-align: left; padding: 9px 14px; font: inherit; font-size: 14px; color: #222; text-decoration: none; background: none; border: 0; cursor: pointer; }
+.menu-list { position: absolute; right: 0; top: 36px; min-width: 200px; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); z-index: 6; padding: 4px 0; }
+.menu-list a, .menu-list button { display: block; width: 100%; text-align: left; padding: 9px 14px; font: inherit; font-size: 14px; color: var(--ink); text-decoration: none; background: none; border: 0; cursor: pointer; }
 .menu-list a:hover, .menu-list button:hover { background: var(--accent-soft); }
 .menu-list .tiny { display: block; }
 
 /* ── Content ── */
 .content { padding: 12px 14px; flex: 1; }
-.card { border: 1px solid #999; border-radius: 6px; padding: 10px 12px; margin: 10px 0; background: #fff; }
-.card.soft { background: #f4f4f4; border-style: dashed; }
-.card.thick { border-width: 1.5px; }
 .card.center { text-align: center; padding-top: 6px; }
-.card h2, .card h3 { font-size: 14px; font-weight: 700; margin: 0; }
-.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.row.top { align-items: flex-start; }
-.muted { color: #666; font-size: 13px; }
-.tiny { color: #666; font-size: 11.5px; }
-.b { font-weight: 700; }
-.hr { border-top: 1px solid #ccc; margin: 10px 0; }
-.label { display: block; font-size: 11.5px; color: #555; text-transform: uppercase; letter-spacing: .3px; margin-top: 8px; }
-.right-text { text-align: right; }
-.mono { font-family: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace; letter-spacing: .5px; }
+.fee-total { font-size: 16px; margin-top: 4px; }
+.amount { font-size: 18px; }
+.terms-list { margin: 0; padding-left: 20px; }
+.terms-list li + li { margin-top: 6px; }
 
-/* ── Buttons ── */
-.btn { display: block; width: 100%; text-align: center; padding: 11px 0; border-radius: 6px; font: inherit; font-weight: 600; font-size: 15px; line-height: 1.35; margin-top: 10px; border: 1.5px solid #444; cursor: pointer; text-decoration: none; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); }
-.btn.secondary { background: #fff; color: var(--accent-dark); border-color: var(--accent); }
-.btn.secondary:hover:not(:disabled) { background: var(--accent-soft); }
-.btn.line { background: var(--line-green); border-color: var(--line-green); color: #fff; }
-.btn.line:hover:not(:disabled) { background: #05b24c; border-color: #05b24c; }
-.btn.small { padding: 7px 0; font-size: 13px; margin-top: 8px; }
-.btn.narrow { font-size: 13.5px; }
-.btn:disabled, .btn.disabled { border-color: #bbb; color: #999; background: #f3f3f3; cursor: default; }
-button.link { border: 0; background: none; padding: 0; font: inherit; color: #666; text-decoration: underline; cursor: pointer; }
-
-/* ── Forms ── */
-input:not([type]), input[type="text"], input[type="tel"] { display: block; width: 100%; border: 1.5px solid #999; border-radius: 5px; padding: 9px 10px; margin: 4px 0 8px; font: inherit; color: #222; background: #fff; }
-input:not([type]):focus, input[type="text"]:focus, input[type="tel"]:focus { outline: none; border-color: var(--accent); }
-input.err { border-color: #222; border-width: 2px; }
-.errtext { font-size: 12px; color: #222; font-weight: 600; margin: -4px 0 8px; }
-input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border: 1.5px solid #555; border-radius: 3px; vertical-align: -3px; margin: 0 8px 0 0; background: #fff; display: inline-grid; place-content: center; cursor: pointer; flex: none; }
-input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
-input[type="checkbox"]:checked::before { content: "✓"; color: #fff; font-size: 12px; line-height: 1; }
-label.check-line { display: block; margin: 8px 0; cursor: pointer; }
-.stepper { display: inline-flex; border: 1.5px solid #555; border-radius: 6px; overflow: hidden; }
-.stepper button { width: 36px; padding: 5px 0; border: 0; background: #fff; color: #222; font: inherit; font-size: 16px; line-height: 1.35; cursor: pointer; }
-.stepper button:disabled { color: #aaa; cursor: default; }
-.stepper .v { width: 44px; padding: 5px 0; text-align: center; border-left: 1.5px solid #555; border-right: 1.5px solid #555; font-weight: 700; font-size: 16px; background: #f4f4f4; }
-
-/* ── Badges (the shared Badge: outlined, fill, hatch, dim) ── */
-.badge { display: inline-block; border: 1px solid #666; border-radius: 10px; padding: 1px 9px; font-size: 11px; font-weight: 600; background: #fff; white-space: nowrap; color: #222; }
-.badge.fill { background: #666; color: #fff; border-color: #666; }
-.badge.hatch { background: repeating-linear-gradient(45deg, #f1c35a 0 3px, #fff7e0 3px 6px); border-color: var(--amber); color: #5c3d00; }
-.badge.dim { color: #777; border-color: #aaa; }
-
-/* ── Notices ── */
-.alert { border: 2px solid #222; border-radius: 6px; padding: 9px 11px; margin: 8px 0; font-size: 13px; background: #fff; }
-.alert pre { margin: 6px 0 0; white-space: pre-wrap; font-size: 12px; }
-.alert .link { margin-left: 8px; }
-.notice { padding: 9px 11px; border: 1.5px solid #444; border-radius: 6px; background: repeating-linear-gradient(-45deg, #f3f3f3 0 8px, #fff 8px 16px); font-size: 13px; margin: 8px 0; }
-.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); width: min(calc(100% - 28px), 392px); background: #333; color: #fff; padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.3; z-index: 5; }
-.result { border: 2.5px solid #222; border-radius: 8px; padding: 10px 12px; text-align: center; margin: 8px 0; }
-.result .big { font-size: 24px; font-weight: 800; letter-spacing: 1px; line-height: 1.3; }
-.kv { display: grid; grid-template-columns: 112px 1fr; gap: 3px 8px; font-size: 13.5px; margin: 6px 0; text-align: left; }
-.kv .k { color: #666; }
-.qr { width: 140px; height: 140px; margin: 6px auto; background: conic-gradient(#222 25%, #fff 0 50%, #222 0 75%, #fff 0); background-size: 20px 20px; border: 6px solid #fff; outline: 1.5px solid #555; }
-.qr.small { width: 110px; height: 110px; background-size: 16px 16px; }
-
-/* ── Table map (the shared TableGrid: stage, zones, one shape per table) ── */
-.table-map { margin-top: 4px; }
-.table-map .stage { width: 140px; margin: 2px auto 6px; padding: 2px 0; text-align: center; background: #ddd; border: 1px solid #666; font-size: 11px; font-weight: 700; color: #333; letter-spacing: .5px; }
-.zone { margin: 0; }
-.zone-name { font-size: 10.5px; font-weight: 700; color: #333; text-transform: uppercase; margin: 6px 0 0; }
-.tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); justify-items: center; gap: 0 4px; }
-.table-btn { border: 0; background: none; padding: 0; margin: 0; line-height: 0; cursor: default; }
-.table-btn:not(:disabled) { cursor: pointer; }
-.table-btn svg { display: block; }
-.legend { display: flex; gap: 12px; font-size: 11.5px; margin: 6px 0 2px; flex-wrap: wrap; }
-.legend span { display: inline-flex; align-items: center; gap: 5px; }
-
-/* ── C1: the LINE chat behind the LINE Login dialog ── */
+/* ── The LINE chat behind the LINE Login dialog ── */
 .line-chat { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 592px; }
 .chat { padding: 10px 12px; flex: 1; }
 .bubble { max-width: 250px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 12px; padding: 8px 11px; font-size: 13px; margin: 8px 0; line-height: 1.3; }
@@ -115,8 +46,8 @@ label.check-line { display: block; margin: 8px 0; cursor: pointer; }
 .modal-bg { position: absolute; inset: 0; background: rgba(0, 0, 0, .38); }
 .modal { position: absolute; top: 150px; left: 22px; right: 22px; background: #fff; border: 1.5px solid #444; border-radius: 8px; padding: 14px; font-size: 14px; }
 .modal h2 { font-size: 15px; font-weight: 700; margin: 0; }
-.modal .label { margin-top: 10px; }
+.modal .field { margin-top: 10px; }
 
 /* ── Footer ── */
-.build { flex: none; padding: 12px 14px; color: #999; font-size: 11px; text-align: center; }
-.build .identity { color: #666; }
+.build { flex: none; padding: 12px 14px; color: var(--faint); font-size: 11px; text-align: center; }
+.build .identity { color: var(--muted); }

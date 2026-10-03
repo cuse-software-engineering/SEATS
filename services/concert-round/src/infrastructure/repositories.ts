@@ -27,6 +27,7 @@ export const rounds: RoundRepository = {
   get: (id) => roundDocs.get(id),
   save: (round) => roundDocs.put(round.id, round),
   remove: (id) => roundDocs.delete(id),
+  all: () => roundDocs.list(),
   published: () => roundDocs.find({ status: 'Published' }),
   publishedOnMap: (zoneMapId) => roundDocs.find({ status: 'Published', zoneMapId }),
 };

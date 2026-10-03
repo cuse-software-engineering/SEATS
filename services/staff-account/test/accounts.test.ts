@@ -53,6 +53,16 @@ describe('signIn and signOut', () => {
   });
 });
 
+describe('disableStaffAccount: never your own account', () => {
+  test('the caller\'s own account is refused with a conflict and stays Active; another account is disabled', async () => {
+    const me = (await byName('manager'))!.staffAccountId;
+    const door = (await byName('door1'))!.staffAccountId;
+    await refused(() => d.disableStaffAccount({ staffAccountId: me }, { by: me }), 'conflict');
+    assert.equal((await byName('manager'))?.status, 'Active');
+    assert.equal((await d.disableStaffAccount({ staffAccountId: door }, { by: me })).status, 'Disabled');
+  });
+});
+
 describe('createStaffAccount, updateStaffAccount, disableStaffAccount', () => {
   test('creates an Active account, refuses a bad role, a short password and a taken username', async () => {
     const a = await d.createStaffAccount({ username: 'door2', role: 'front_staff', password: 'door2pw' });

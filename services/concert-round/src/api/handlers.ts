@@ -44,6 +44,7 @@ export const api: ApiOf<ConcertRoundHandlers> = {
 
   CreateRound: async ({ name }) => toRound(await d.createRound({ name })),
   GetUpcomingRounds: async () => ({ rounds: await d.getUpcomingRounds() }),
+  ListRounds: async (_empty, ctx) => ({ rounds: await Promise.all((await d.listRounds()).filter((r) => ctx.role !== 'customer' || r.status === 'Published').map(toRound)) }),
   GetRound: async ({ roundId }, ctx) => toRound(visible(await d.getRound(roundId), ctx)),
   GetRoundTables: async ({ roundId }, ctx) => ({ tables: (await d.getRoundTables(visible(await d.getRound(roundId), ctx).id)).map((t) => ({ ...t, packagePrice: t.packagePrice ?? undefined })) }),
   UpdateRound: async ({ roundId, tablesNotForSale, prices, ...fields }) =>

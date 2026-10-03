@@ -11,6 +11,7 @@ import type { Empty as _seats_concertround_v1_Empty, Empty__Output as _seats_con
 import type { ListZoneMapsRequest as _seats_concertround_v1_ListZoneMapsRequest, ListZoneMapsRequest__Output as _seats_concertround_v1_ListZoneMapsRequest__Output } from '../../../seats/concertround/v1/ListZoneMapsRequest';
 import type { Removed as _seats_concertround_v1_Removed, Removed__Output as _seats_concertround_v1_Removed__Output } from '../../../seats/concertround/v1/Removed';
 import type { Round as _seats_concertround_v1_Round, Round__Output as _seats_concertround_v1_Round__Output } from '../../../seats/concertround/v1/Round';
+import type { RoundList as _seats_concertround_v1_RoundList, RoundList__Output as _seats_concertround_v1_RoundList__Output } from '../../../seats/concertround/v1/RoundList';
 import type { RoundPricing as _seats_concertround_v1_RoundPricing, RoundPricing__Output as _seats_concertround_v1_RoundPricing__Output } from '../../../seats/concertround/v1/RoundPricing';
 import type { RoundRef as _seats_concertround_v1_RoundRef, RoundRef__Output as _seats_concertround_v1_RoundRef__Output } from '../../../seats/concertround/v1/RoundRef';
 import type { RoundTableList as _seats_concertround_v1_RoundTableList, RoundTableList__Output as _seats_concertround_v1_RoundTableList__Output } from '../../../seats/concertround/v1/RoundTableList';
@@ -144,6 +145,15 @@ export interface ConcertRoundClient extends grpc.Client {
   getZoneMap(argument: _seats_concertround_v1_ZoneMapRef, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_ZoneMap__Output>): grpc.ClientUnaryCall;
   getZoneMap(argument: _seats_concertround_v1_ZoneMapRef, callback: grpc.requestCallback<_seats_concertround_v1_ZoneMap__Output>): grpc.ClientUnaryCall;
   
+  ListRounds(argument: _seats_concertround_v1_Empty, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  ListRounds(argument: _seats_concertround_v1_Empty, metadata: grpc.Metadata, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  ListRounds(argument: _seats_concertround_v1_Empty, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  ListRounds(argument: _seats_concertround_v1_Empty, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  listRounds(argument: _seats_concertround_v1_Empty, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  listRounds(argument: _seats_concertround_v1_Empty, metadata: grpc.Metadata, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  listRounds(argument: _seats_concertround_v1_Empty, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  listRounds(argument: _seats_concertround_v1_Empty, callback: grpc.requestCallback<_seats_concertround_v1_RoundList__Output>): grpc.ClientUnaryCall;
+  
   ListTableTypes(argument: _seats_concertround_v1_Empty, metadata: grpc.Metadata, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_TableTypeList__Output>): grpc.ClientUnaryCall;
   ListTableTypes(argument: _seats_concertround_v1_Empty, metadata: grpc.Metadata, callback: grpc.requestCallback<_seats_concertround_v1_TableTypeList__Output>): grpc.ClientUnaryCall;
   ListTableTypes(argument: _seats_concertround_v1_Empty, options: grpc.CallOptions, callback: grpc.requestCallback<_seats_concertround_v1_TableTypeList__Output>): grpc.ClientUnaryCall;
@@ -254,6 +264,8 @@ export interface ConcertRoundHandlers extends grpc.UntypedServiceImplementation 
   
   GetZoneMap: grpc.handleUnaryCall<_seats_concertround_v1_ZoneMapRef__Output, _seats_concertround_v1_ZoneMap>;
   
+  ListRounds: grpc.handleUnaryCall<_seats_concertround_v1_Empty__Output, _seats_concertround_v1_RoundList>;
+  
   ListTableTypes: grpc.handleUnaryCall<_seats_concertround_v1_Empty__Output, _seats_concertround_v1_TableTypeList>;
   
   ListZoneMaps: grpc.handleUnaryCall<_seats_concertround_v1_ListZoneMapsRequest__Output, _seats_concertround_v1_ZoneMapList>;
@@ -288,6 +300,7 @@ export interface ConcertRoundDefinition extends grpc.ServiceDefinition {
   GetRoundTables: MethodDefinition<_seats_concertround_v1_RoundRef, _seats_concertround_v1_RoundTableList, _seats_concertround_v1_RoundRef__Output, _seats_concertround_v1_RoundTableList__Output>
   GetUpcomingRounds: MethodDefinition<_seats_concertround_v1_Empty, _seats_concertround_v1_UpcomingRoundList, _seats_concertround_v1_Empty__Output, _seats_concertround_v1_UpcomingRoundList__Output>
   GetZoneMap: MethodDefinition<_seats_concertround_v1_ZoneMapRef, _seats_concertround_v1_ZoneMap, _seats_concertround_v1_ZoneMapRef__Output, _seats_concertround_v1_ZoneMap__Output>
+  ListRounds: MethodDefinition<_seats_concertround_v1_Empty, _seats_concertround_v1_RoundList, _seats_concertround_v1_Empty__Output, _seats_concertround_v1_RoundList__Output>
   ListTableTypes: MethodDefinition<_seats_concertround_v1_Empty, _seats_concertround_v1_TableTypeList, _seats_concertround_v1_Empty__Output, _seats_concertround_v1_TableTypeList__Output>
   ListZoneMaps: MethodDefinition<_seats_concertround_v1_ListZoneMapsRequest, _seats_concertround_v1_ZoneMapList, _seats_concertround_v1_ListZoneMapsRequest__Output, _seats_concertround_v1_ZoneMapList__Output>
   PublishRound: MethodDefinition<_seats_concertround_v1_RoundRef, _seats_concertround_v1_Round, _seats_concertround_v1_RoundRef__Output, _seats_concertround_v1_Round__Output>

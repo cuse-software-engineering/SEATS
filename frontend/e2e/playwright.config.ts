@@ -25,8 +25,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'customer', testMatch: /uc-0[19]\.spec\.ts$/, use: { ...devices['Desktop Chrome'], baseURL: CUSTOMER } },
-    { name: 'backoffice', testMatch: /uc-0[348]\.spec\.ts$/, use: { ...devices['Desktop Chrome'], baseURL: BACK_OFFICE } },
+    { name: 'customer', testMatch: /(uc-0[19]|customer-.*)\.spec\.ts$/, use: { ...devices['Desktop Chrome'], baseURL: CUSTOMER } },
+    { name: 'backoffice', testMatch: /(uc-0[348]|backoffice-.*)\.spec\.ts$/, use: { ...devices['Desktop Chrome'], baseURL: BACK_OFFICE } },
   ],
   webServer: [
     ...(given('GATEWAY') ? [] : [server('npm run dev:mono', `${GATEWAY}/health`)]),

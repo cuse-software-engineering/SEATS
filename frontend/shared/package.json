@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Shared by the two web apps: the API types generated from docs/openapi.yaml, the typed fetch client, the fake-auth session and small React helpers. The apps compile the TypeScript sources themselves (Vite).",
+  "description": "Shared by the two web apps: the API types generated from docs/openapi.yaml, the typed fetch client, the session store (Zustand), server state through TanStack Query with toasts and the confirm dialog, the component kit with its stylesheet (kit.css), the table map and the logo. The apps compile the TypeScript sources themselves (Vite).",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./src/*": "./src/*"
   },
   "scripts": {
     "api-types": "openapi-typescript ../../docs/openapi.yaml -o src/api-types.d.ts",
@@ -19,5 +20,9 @@
     "@types/react": "^18.3.0",
     "openapi-typescript": "^7.6.0",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.104.1",
+    "zustand": "^5.0.15"
   }
 }

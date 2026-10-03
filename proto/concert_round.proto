@@ -25,6 +25,7 @@ service ConcertRound {
   // concert rounds (UC-03, UC-01): C R U D
   rpc CreateRound(CreateRoundRequest) returns (Round);
   rpc GetUpcomingRounds(Empty) returns (UpcomingRoundList);
+  rpc ListRounds(Empty) returns (RoundList);                   // the back-office: every round, Draft and Published, newest first
   rpc GetRound(RoundRef) returns (Round);                      // also the Booking Service: is booking open? which tables?
   rpc GetRoundTables(RoundRef) returns (RoundTableList);
   rpc UpdateRound(UpdateRoundRequest) returns (Round);         // Published: only what UC-03 AF-3 allows (BRULE-07)
@@ -153,6 +154,7 @@ message UpcomingRound {
   int32 tables_for_sale = 9;
 }
 message UpcomingRoundList { repeated UpcomingRound rounds = 1; }
+message RoundList { repeated Round rounds = 1; }
 message CreateRoundRequest { optional string name = 1; }
 message TableNumbers { repeated int32 values = 1; }
 message PackagePrices { repeated PackagePrice values = 1; }

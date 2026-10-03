@@ -23,6 +23,7 @@ export interface ProtoGrpcType {
         PackagePrices: MessageTypeDefinition
         Removed: MessageTypeDefinition
         Round: MessageTypeDefinition
+        RoundList: MessageTypeDefinition
         RoundPricing: MessageTypeDefinition
         RoundRef: MessageTypeDefinition
         RoundTable: MessageTypeDefinition

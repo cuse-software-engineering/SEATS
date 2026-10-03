@@ -53,6 +53,7 @@ export const ROUTES: Route[] = [
   // Concert Round Service: rounds (UC-03; the customer reads them, UC-01)
   route('POST', '/api/rounds', ['manager'], CR('createRound'), (c) => ({ name: c.body.name })),
   route('GET', '/api/rounds', ANY, CR('getUpcomingRounds'), undefined, { pick: (r) => r.rounds }),
+  route('GET', '/api/rounds/all', MANAGEMENT, CR('listRounds'), undefined, { pick: (r) => r.rounds }),   // before /api/rounds/:id
   route('GET', '/api/rounds/:id', ANY, CR('getRound'), (c) => ({ roundId: c.params.id })),
   route('GET', '/api/rounds/:id/tables', ANY, CR('getRoundTables'), (c) => ({ roundId: c.params.id }), { pick: (r) => r.tables }),
   route('PUT', '/api/rounds/:id', ['manager'], CR('updateRound'), (c) => ({ roundId: c.params.id, ...c.body, tablesNotForSale: wrap(c.body.tablesNotForSale), prices: wrap(c.body.prices) })),

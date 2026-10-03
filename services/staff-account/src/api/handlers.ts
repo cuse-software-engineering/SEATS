@@ -13,5 +13,5 @@ export const api: ApiOf<StaffAccountsHandlers> = {
   CreateStaffAccount: async (req) => domain.createStaffAccount(req),
   ListStaffAccounts: async () => ({ accounts: await domain.listStaffAccounts() }),
   UpdateStaffAccount: async (req) => domain.updateStaffAccount(req),
-  DisableStaffAccount: async (req) => domain.disableStaffAccount(req),
+  DisableStaffAccount: async (req, ctx) => domain.disableStaffAccount(req, { by: ctx.caller }),
 };

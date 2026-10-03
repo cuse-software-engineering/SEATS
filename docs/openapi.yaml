@@ -249,6 +249,18 @@ paths:
       responses:
         '200': { description: The rounds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UpcomingRound' } } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/rounds/all:
+    get:
+      tags: [Concert Round Service]
+      summary: Every round of the venue, Draft and Published, newest first, for the back-office (listRounds)
+      operationId: listRounds
+      x-grpc: ConcertRound/ListRounds
+      x-roles: [manager, owner]
+      x-web-app: back-office
+      responses:
+        '200': { description: The rounds, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Round' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /api/rounds/{id}:
     get:
       tags: [Concert Round Service]

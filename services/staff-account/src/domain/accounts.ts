@@ -81,8 +81,10 @@ export async function updateStaffAccount({ staffAccountId, role, password }: { s
 }
 
 /** D — a disabled account keeps its history but cannot sign in; its sessions end now. Idempotent. */
-export async function disableStaffAccount({ staffAccountId }: { staffAccountId?: string }): Promise<StaffAccountView> {
+/** UC-08: the manager disables an account; never their own (`by` is the caller's account id), so the venue always keeps a manager who can sign in. */
+export async function disableStaffAccount({ staffAccountId }: { staffAccountId?: string }, { by }: { by?: string } = {}): Promise<StaffAccountView> {
   const a = await requireAccount(staffAccountId ?? '');
+  if (by && by === a.staffAccountId) throw new DomainError('conflict', 'you cannot disable your own account');
   a.status = 'Disabled';
   for (const s of await ports.sessions.ofAccount(a.staffAccountId)) await ports.sessions.remove(s.token);
   return view(await ports.accounts.save(a));

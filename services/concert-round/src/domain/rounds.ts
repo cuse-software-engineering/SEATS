@@ -101,6 +101,12 @@ export async function discardDraftRound(id: string): Promise<{ removed: boolean 
   return { removed: true };
 }
 
+/** The back-office's list (UC-03): every round, Draft and Published; a round without a date (a fresh Draft) first,
+ *  then the latest date first, the newest round first on the same date. */
+export async function listRounds(): Promise<Round[]> {
+  return (await ports.rounds.all()).sort((a, b) => (a.date === b.date ? b.createdAt.localeCompare(a.createdAt) : a.date === '' ? -1 : b.date === '' ? 1 : b.date.localeCompare(a.date)));
+}
+
 export async function getUpcomingRounds(): Promise<UpcomingRound[]> {                              // UC-01 step 3 (FR-03), AF-1, AF-2
   const today = iso(now()).slice(0, 10);
   const list = (await ports.rounds.published()).filter((r) => r.date >= today).sort((a, b) => a.startAt.localeCompare(b.startAt));

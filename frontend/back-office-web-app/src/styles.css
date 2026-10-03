@@ -1,17 +1,17 @@
-/* SEATS Back-office Web App: the look of the wireframes of Appendix D (B1 to B7), taken from their HTML sources
-   (assets/screen-b*.html): grayscale, status by pattern and label, never by colour alone. A dark top bar, a left
-   sidebar, white content with cards ("panels"), bordered tables, dark primary buttons, white secondary buttons; one
-   accent colour on the primary actions, the links and the current sidebar item, a tint per table status.
-   Below 700px (the front staff's phone, B5 and B6) the sidebar is a drawer behind the ☰ and a screen a phone column. */
-:root { --accent: #2457c5; --accent-dark: #1c46a0; --accent-soft: #e8eefc; --bar: #1e2a44; --amber: #b7791f; }
-* { box-sizing: border-box; }
+/* SEATS Back-office Web App: the shell around the shared kit (frontend/shared/src/kit.css, imported first in
+   main.tsx): the dark top bar with the wordmark and the signed-in account, the sidebar (a drawer behind ☰ under
+   700px), the content area, the three-column editors with their lists of maps and rounds, the dashed-zone canvas,
+   the live view, the phone screens of check-in and the sign-in card. Buttons, fields, cards, tables, badges, chips,
+   toasts, the dialog and the table map are the kit's. */
+:root { --bar: #1e2a44; }
 html, body { margin: 0; height: 100%; }
-body { color: #222; background: #fff; font: 13.5px/1.35 "Noto Sans", "Liberation Sans", Arial, system-ui, sans-serif; }
+body { color: var(--ink); background: #fff; font: 13.5px/1.35 "Noto Sans", "Liberation Sans", Arial, system-ui, sans-serif; }
 #root { min-height: 100vh; display: flex; flex-direction: column; }
-code { font-family: "DejaVu Sans Mono", "Liberation Mono", ui-monospace, monospace; font-size: 0.92em; }
-a { color: var(--accent-dark); }
 h1, h2, h3, h4, p { margin: 0; font-size: inherit; }
 ul { margin: 0; padding-left: 18px; }
+a { color: var(--accent-dark); }
+.center { text-align: center; }
+.pt { font-weight: 700; font-size: 13.5px; margin: 0 0 6px; }
 
 /* ── Shell: top bar, sidebar, content ── */
 .topbar { flex: none; height: 44px; background: var(--bar); color: #fff; display: flex; align-items: center; padding: 0 16px; font-weight: 700; font-size: 16px; gap: 12px; }
@@ -19,7 +19,6 @@ ul { margin: 0; padding-left: 18px; }
 .topbar .burger[aria-expanded="true"] { background: rgba(255, 255, 255, .18); }
 .topbar .brand { display: inline-flex; align-items: center; gap: 7px; }
 .topbar .logo, .signin .logo { vertical-align: -2px; }
-.signin .title .logo { margin-right: 4px; }
 .topbar .who { margin-left: auto; font-weight: 400; font-size: 12.5px; color: #ddd; white-space: nowrap; }
 .wbody { display: flex; flex: 1; min-height: 0; }
 .nav { width: 180px; flex: none; background: #f0f0f0; border-right: 1px solid #bbb; padding: 8px 0; font-size: 14px; display: flex; flex-direction: column; }
@@ -28,155 +27,100 @@ ul { margin: 0; padding-left: 18px; }
 .nav a.cur { background: var(--accent-soft); color: var(--accent-dark); font-weight: 700; border-left-color: var(--accent); }
 .nav .sep { border-top: 1px solid #bbb; margin: 8px 12px; }
 .main { flex: 1; min-width: 0; padding: 14px 16px; overflow: auto; line-height: 1.35; }
-.main h1 { font-size: 17px; margin: 0 0 10px; }
 .build { margin-top: 20px; color: #999; font-size: 10.5px; text-align: right; }
+/* the toasts sit under the top bar at the right, clear of the action buttons at the bottom of the editors */
+.toast-stack { left: auto; right: 16px; top: 54px; bottom: auto; transform: none; align-items: flex-end; }
 
-/* ── Text ── */
-.muted { color: #666; font-size: 13px; }
-.tiny { color: #666; font-size: 12px; }
-.b { font-weight: 700; }
-.center { text-align: center; }
-.label { display: block; font-size: 11.5px; color: #555; text-transform: uppercase; letter-spacing: .3px; margin-top: 8px; }
-.hr { border-top: 1px solid #ccc; margin: 10px 0; }
+/* ── The three-column editors (zone maps, rounds) and the two-column screens ── */
+.editor { display: flex; gap: 12px; align-items: flex-start; }
+.editor .col-list { width: 184px; flex: none; }
+.editor .col-details { width: 320px; flex: none; }
+.editor .col-main { flex: 1 1 360px; min-width: 300px; }
+.editor .col-side { width: 300px; flex: none; }
+.editor .card, .settings .card { margin: 0 0 10px; }
+.editor .input { padding: 5px 8px; font-size: 13px; }
+.editor .field { margin: 5px 0; }
+.editor .field.inline { grid-template-columns: 92px 1fr; }
+.editor .btnrow .btn { font-size: 13px; padding: 7px 12px; }
+.editor-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.editor-head .name { font-weight: 700; font-size: 14px; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cols-2 { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-top: 10px; }
+.editor .cols-2 { margin-top: 0; }
+@media (max-width: 980px) { .editor { flex-wrap: wrap; } .editor .col-side, .editor .col-details { width: 100%; } }
 
-/* ── Columns and panels (cards) ── */
-.cols { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
-.cols > .grow { flex: 1; min-width: 280px; }
-.panel { border: 1px solid #999; border-radius: 6px; padding: 8px 12px; background: #fff; }
-.panel + .panel { margin-top: 8px; }
-.pt { font-weight: 700; font-size: 13.5px; margin: 0 0 6px; }
-.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.frow { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
-.frow .fl { width: 92px; flex: none; color: #555; font-size: 12px; }
-.frow input, .frow select, .frow .fin { flex: 1; min-width: 0; }
-.frow .unit { color: #666; font-size: 12px; flex: none; }
-
-/* ── Inputs ── */
-input, select, textarea { font: inherit; font-size: 13px; color: #222; border: 1.5px solid #999; border-radius: 5px; padding: 4px 8px; background: #fff; }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
-input:disabled, select:disabled { background: #f3f3f3; color: #777; }
-input.err { border-color: #222; border-width: 2px; }
-.input { display: block; width: 100%; padding: 9px 10px; margin: 4px 0 8px; }
-.wide { display: block; width: 100%; }
-
-/* ── Tables ── */
-.tbl { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-.tbl th, .tbl td { border: 1px solid #bbb; padding: 4px 7px; text-align: left; vertical-align: top; }
-.tbl th { background: #eee; font-weight: 700; font-size: 11.5px; }
-.tbl tr.sel td { background: #e2e2e2; font-weight: 600; }
-.tbl td.num, .tbl th.num { text-align: right; }
-.tbl td.err { border: 2px solid #222; }
-.tbl.small { font-size: 12px; }
-.tbl.clickable tbody tr { cursor: pointer; }
-.tbl.clickable tbody tr:hover td { background: #f4f4f4; }
-.tbl input, .tbl select { width: 100%; padding: 2px 6px; font-size: 12.5px; }
-.tbl input.price { font-weight: 700; }
-.tbl td.cell-stack input + input { margin-top: 3px; font-size: 11.5px; }
-
-/* ── Buttons: white with a dark border; .primary dark; disabled grey ── */
-button, .btn { font: inherit; font-weight: 600; font-size: 13px; line-height: 1.2; padding: 7px 14px; border-radius: 6px; border: 1.5px solid #444; background: #fff; color: #333; cursor: pointer; display: inline-block; text-align: center; text-decoration: none; }
-button:hover:not(:disabled), .btn:hover { background: #f0f0f0; }
-button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.primary:hover:not(:disabled), .btn.primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
-button:disabled, .btn.disabled { border-color: #bbb; color: #999; background: #f3f3f3; cursor: not-allowed; }
-button.small, .btn.small { padding: 5px 12px; font-size: 12px; }
-button.wide, .btn.wide { display: block; width: 100%; padding: 11px 0; font-size: 15px; }
-button.small.wide { padding: 7px 0; font-size: 13px; }
-button.link { border: 0; background: none; padding: 0; font-weight: 400; color: #444; text-decoration: underline; font-size: inherit; border-radius: 0; }
-button.link:hover:not(:disabled) { background: none; color: #000; }
-button.link:disabled { background: none; border: 0; }
-.btnrow { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
-
-/* ── Badges and chips ── */
-.badge { display: inline-block; border: 1px solid #666; border-radius: 10px; padding: 1px 9px; font-size: 11px; font-weight: 600; background: #fff; color: #222; white-space: nowrap; vertical-align: middle; }
-.badge.fill { background: #666; color: #fff; border-color: #666; }
-.badge.hatch { background: repeating-linear-gradient(45deg, #f1c35a 0 3px, #fff7e0 3px 6px); border-color: var(--amber); color: #5c3d00; }
-.badge.dim { color: #777; border-color: #aaa; }
-.chip { display: inline-block; border: 1px solid #666; border-radius: 12px; padding: 1px 9px; font-size: 12px; margin: 2px 4px 2px 0; background: #fff; color: #222; font-weight: 400; line-height: 1.35; }
-button.chip:hover:not(:disabled) { background: #eee; }
-.chip.add { border-style: dashed; color: #555; appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 9px; }
-.chip.add:disabled { color: #999; border-color: #bbb; background: #fff; }
-
-/* ── Lists of maps and rounds (B2, B3) ── */
-.list h1.hd { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
-.list form { margin: 0 0 6px; }
-.list form input { width: 100%; margin-bottom: 4px; font-size: 12.5px; }
-.list .it { display: block; width: 100%; text-align: left; border: 1px solid #aaa; border-radius: 6px; padding: 7px 10px; margin: 6px 0; font-size: 13px; line-height: 1.3; background: #fff; color: #222; font-weight: 400; }
+/* ── The lists of maps and rounds ── */
+.list h1 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+.list .new { margin-bottom: 6px; }
+.list .new .input { margin-bottom: 4px; font-size: 12.5px; padding: 5px 8px; }
+.list .new .btn.block { margin-top: 0; }
+.list .items { max-height: calc(100vh - 230px); overflow: auto; }
+.list .it { display: block; width: 100%; text-align: left; border: 1px solid #aaa; border-radius: 6px; padding: 7px 10px; margin: 6px 0; font: inherit; font-size: 13px; line-height: 1.3; background: #fff; color: var(--ink); cursor: pointer; }
 .list .it .badge { margin-top: 4px; }
-.list .it.cur { background: #e2e2e2; border-color: #333; border-width: 2px; padding: 6px 9px; }
+.list .it.cur { background: var(--accent-soft); border-color: var(--accent); border-width: 2px; padding: 6px 9px; }
 .list .it.cur .name { font-weight: 700; }
-.list .it:hover:not(:disabled) { background: #f0f0f0; }
-.list .it.cur:hover { background: #e2e2e2; }
-.list .idbox { margin-top: 10px; }
-.list .idbox form { display: flex; gap: 4px; }
-.list .idbox input { margin: 0; }
+.list .it:hover { background: #f0f0f0; }
+.list .it.cur:hover { background: var(--accent-soft); }
 
-/* ── Validation result (B2, B3), alerts, notices ── */
+/* ── The validation box of the editors ── */
 .vbox { border: 2px solid #222; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; background: #fff; margin-top: 10px; }
-.vbox.ok { border-style: dashed; border-color: #2f7d4a; }
+.vbox.ok { border-color: var(--green); background: var(--green-soft); }
 .vbox .t { font-weight: 700; margin-bottom: 3px; }
-.alert { border: 2px solid #222; border-radius: 6px; padding: 8px 12px; margin: 8px 0; font-size: 12.5px; background: repeating-linear-gradient(-45deg, #f3f3f3 0 8px, #fff 8px 16px); }
-.alert pre { white-space: pre-wrap; margin: 4px 0 0; font-size: 11.5px; }
-.alert .link { margin-left: 8px; }
-.notice { border: 1.5px solid #444; border-radius: 6px; padding: 8px 12px; margin: 8px 0; font-size: 12.5px; background: #f4f4f4; }
 
-/* ── The table map (the shared TableGrid): the stage, a block per zone, SVG shapes ── */
-.table-map { position: relative; }
-.table-map .stage { width: 140px; max-width: 60%; margin: 0 auto 8px; background: #ddd; border: 1px solid #666; text-align: center; font-size: 11px; font-weight: 700; color: #333; padding: 2px 0; letter-spacing: .5px; }
-.zone { margin: 0 0 6px; }
-.zone-name { font-size: 11px; font-weight: 700; color: #333; margin: 0 0 2px; }
-.tables { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: flex-end; }
-.table-btn { border: 0; background: none; padding: 0; margin: 0; line-height: 0; cursor: pointer; border-radius: 6px; }
-.table-btn:disabled { cursor: default; background: none; border: 0; }
-.table-btn:hover:not(:disabled) { background: rgba(0, 0, 0, .06); }
-.table-btn svg { display: block; }
-.table-map .muted { font-size: 12px; }
-/* B2: the zones as dashed boxes over the striped venue-image placeholder */
+/* ── The zone map canvas: the zones as dashed boxes over the striped venue-image placeholder ── */
 .map-canvas { position: relative; padding: 8px 8px 22px; border: 1px solid #bbb; background: repeating-linear-gradient(-45deg, #f5f5f5 0 6px, #ebebeb 6px 12px); min-height: 220px; }
 .map-canvas .zone { border: 1.3px dashed #333; border-radius: 4px; padding: 4px 6px 6px; margin: 0 0 4px; }
-.map-canvas .zone-name { font-size: 10.5px; }
+.map-canvas .zone-name { font-size: 10.5px; margin-top: 0; }
 .map-canvas .venue-image { position: absolute; right: 8px; bottom: 4px; font-size: 10.5px; font-style: italic; color: #777; }
-/* B4: the zone titles as in the wireframe */
-.live .zone-name { font-size: 13px; text-transform: uppercase; margin: 4px 0; }
+.upload .input { flex: 1; width: auto; min-width: 160px; }
+.zone-edit { margin-top: 6px; }
+.zone-edit .btn.link { font-size: 12px; }
+
+/* ── The price matrix and the preview box of the round editor ── */
+.matrix .input { width: 100%; min-width: 0; padding: 3px 6px; font-size: 12.5px; }
+.matrix td.cell-stack { min-width: 110px; }
+.matrix .price { font-weight: 700; }
+.matrix td.cell-stack .input + .input { margin-top: 3px; font-size: 11.5px; }
+.preview-box { width: 118px; height: 196px; border-radius: 12px; padding: 8px; flex: none; cursor: pointer; font: inherit; }
+.preview-box:hover, .preview-box[aria-pressed="true"] { background: repeating-linear-gradient(-45deg, #e4e4e4 0 6px, #f4f4f4 6px 12px); }
+
+/* ── The live view ── */
+.live-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.live-head .field { margin: 0; }
+.live-head .field.inline { grid-template-columns: auto 1fr; }
+.live .zone-name { font-size: 13px; margin: 4px 0; }
 .live .table-map .stage { width: 200px; }
-.legend { display: flex; gap: 12px; font-size: 12.5px; margin-top: 8px; flex-wrap: wrap; }
-.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.live-left { width: 522px; flex: none; max-width: 100%; }
+.live-right { flex: 1; min-width: 280px; }
 .counts { display: flex; gap: 10px; margin: 8px 0 0; font-size: 13px; flex-wrap: wrap; align-items: center; }
 .counts span { border: 1px solid #999; border-radius: 6px; padding: 4px 10px; background: #f7f7f7; white-space: nowrap; }
-.counts span.plain { border: 0; background: none; padding: 4px 0; color: #666; font-size: 12px; }
+.counts span.plain { border: 0; background: none; padding: 4px 0; color: var(--muted); font-size: 12px; }
 
-/* ── Placeholders: the preview box of B3, the viewfinder of B5 ── */
-.placeholder { background: repeating-linear-gradient(-45deg, #eee 0 6px, #f8f8f8 6px 12px); border: 1px dashed #999; color: #666; display: flex; align-items: center; justify-content: center; font-size: 12.5px; text-align: center; }
-.preview-box { width: 118px; height: 196px; border-radius: 12px; padding: 8px; flex: none; cursor: pointer; font: inherit; }
-.preview-box:hover { background: repeating-linear-gradient(-45deg, #e4e4e4 0 6px, #f4f4f4 6px 12px); }
-.viewfinder { width: 300px; max-width: 100%; height: 230px; margin: 14px auto 10px; position: relative; background: repeating-linear-gradient(-45deg, #e9e9e9 0 6px, #f6f6f6 6px 12px); border: 1px solid #999; }
-.viewfinder .frame { position: absolute; left: 50%; top: 30px; width: 170px; height: 170px; margin-left: -85px; border: 2.5px dashed #333; }
-.viewfinder .hint { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 12px; color: #444; }
+/* ── The settings screen ── */
+.settings .business-parameters { width: 400px; flex: none; max-width: 100%; }
+.settings .staff-accounts { flex: 1; min-width: 320px; }
+.settings .field.inline { grid-template-columns: 110px 1fr; }
+.settings .create-account, .settings .change-role { border: 1px dashed var(--line-soft); border-radius: var(--radius); padding: 2px 10px 8px; margin: 6px 0 10px; }
 
-/* ── Phone screens (B5, B6): the app bar and the content column ── */
+/* ── The phone screens of check-in: the app bar, the content column, the viewfinder, the mini map ── */
 .phone-screen { width: 360px; max-width: 100%; margin: 0 auto; border: 1px solid #bbb; border-radius: 8px; overflow: hidden; background: #fff; }
 .appbar { min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #bbb; font-weight: 600; font-size: 16px; background: #f5f5f5; }
 .appbar .back { font-size: 22px; color: #444; font-weight: 400; text-decoration: none; line-height: 1; }
 .appbar .right { margin-left: auto; font-weight: 400; font-size: 12px; }
-.appbar .right select { font-size: 12px; padding: 2px 6px; }
 .content { padding: 8px 14px 14px; font-size: 14px; line-height: 1.35; }
-.content .btn, .content button.wide { margin-top: 10px; }
-.result { border: 2.5px solid #222; border-radius: 8px; padding: 10px 12px; text-align: center; margin: 8px 0; }
-.result .big { font-size: 24px; font-weight: 800; letter-spacing: 1px; }
-.kv { display: grid; grid-template-columns: 112px 1fr; gap: 3px 8px; font-size: 13.5px; margin: 6px 0; }
-.kv .k { color: #666; }
-.banner { padding: 9px 11px; border: 1.5px solid #444; border-radius: 6px; background: repeating-linear-gradient(-45deg, #f3f3f3 0 8px, #fff 8px 16px); font-size: 13px; margin: 8px 0; }
+.content .field.inline { grid-template-columns: 56px 1fr; }
+.viewfinder { width: 300px; max-width: 100%; height: 230px; margin: 14px auto 10px; position: relative; background: repeating-linear-gradient(-45deg, #e9e9e9 0 6px, #f6f6f6 6px 12px); border: 1px solid #999; }
+.viewfinder .frame { position: absolute; left: 50%; top: 30px; width: 170px; height: 170px; margin-left: -85px; border: 2.5px dashed #333; }
+.viewfinder .hint { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 12px; color: #444; }
 .mini-map { margin: 8px 0; }
 .mini-map .table-map .stage { width: 160px; }
 
-/* ── Sign-in (B1) ── */
-.signin { width: 360px; max-width: 100%; margin: 110px auto 0; border: 1px solid #999; border-radius: 8px; padding: 22px 26px; }
+/* ── The sign-in card ── */
+.signin { width: 360px; max-width: 100%; margin: 110px auto 0; border: 1px solid var(--line); border-radius: 8px; padding: 22px 26px; }
 .signin .title { font-size: 20px; font-weight: 700; margin-bottom: 2px; }
-.signin .btn, .signin button.wide { margin-top: 10px; }
-.signin-page .dev { width: 360px; max-width: 100%; margin: 10px auto 0; }
-.signin-page .dev-link { width: 360px; max-width: 100%; margin: 12px auto 0; text-align: center; }
+.signin .btn.block { margin-top: 12px; }
+.signin-page .demo-accounts { width: 360px; max-width: 100%; margin: 12px auto 0; text-align: center; }
 
-/* ── The staff phone (B5, B6) and any narrow window ── */
+/* ── The staff phone and any narrow window ── */
 @media (max-width: 700px) {
   .topbar { padding: 0 12px; font-size: 15px; }
   .topbar .burger { display: inline-block; }
@@ -187,5 +131,5 @@ button.chip:hover:not(:disabled) { background: #eee; }
   .main { padding: 10px 12px; }
   .phone-screen { width: auto; margin: -10px -12px 0; border: 0; border-radius: 0; }
   .signin { margin-top: 40px; padding: 18px; }
-  .frow .fl { width: 80px; }
+  .editor .col-list, .editor .col-details, .editor .col-side, .live-left, .settings .business-parameters { width: 100%; }
 }

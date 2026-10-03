@@ -1,6 +1,9 @@
-// The signed-in identity. Progress 1 authentication is fake: two headers, x-user-id and x-role (openapi.yaml,
-// securitySchemes). The customer app stores a LINE user id typed once (LINE Login comes with ADR-01); the back-office
-// stores the answer of POST /api/sessions. Kept in localStorage so a reload keeps it; a tiny store for React.
+// The signed-in identity, a Zustand store kept in localStorage so a reload keeps it. Progress 1 authentication is
+// fake: two headers, x-user-id and x-role (openapi.yaml, securitySchemes). The customer app stores a LINE user id
+// typed once (LINE Login comes with ADR-01); the back-office stores the answer of POST /api/sessions.
+import { createStore } from 'zustand/vanilla';
+import { useStore } from 'zustand';
+
 export type Role = 'customer' | 'manager' | 'front_staff' | 'owner';
 export interface Session {
   userId: string;   // x-user-id: the LINE user id, or the staff account id
@@ -11,8 +14,6 @@ export interface Session {
 
 const KEY = 'seats.session';
 const ROLES: readonly string[] = ['customer', 'manager', 'front_staff', 'owner'];
-const listeners = new Set<() => void>();
-
 const isSession = (v: unknown): v is Session =>
   typeof v === 'object' && v !== null && typeof (v as Session).userId === 'string' && ROLES.includes(String((v as Session).role));
 
@@ -27,25 +28,24 @@ function load(): Session | null {
   }
 }
 
-let current: Session | null = load();
-const emit = () => listeners.forEach((l) => l());
+interface SessionState { session: Session | null; setSession: (s: Session) => void; clearSession: () => void }
 
-export const getSession = (): Session | null => current;
+export const sessionStore = createStore<SessionState>((set) => ({
+  session: load(),
+  setSession: (session) => {
+    try { localStorage.setItem(KEY, JSON.stringify(session)); } catch { /* storage blocked: kept in memory only */ }
+    set({ session });
+  },
+  clearSession: () => {
+    try { localStorage.removeItem(KEY); } catch { /* storage blocked */ }
+    set({ session: null });
+  },
+}));
 
-export function setSession(session: Session): void {
-  current = session;
-  try { localStorage.setItem(KEY, JSON.stringify(session)); } catch { /* storage blocked: kept in memory only */ }
-  emit();
-}
-
-export function clearSession(): void {
-  current = null;
-  try { localStorage.removeItem(KEY); } catch { /* storage blocked */ }
-  emit();
-}
-
-/** For useSyncExternalStore: called after every change of the session. */
-export function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
-}
+export const getSession = (): Session | null => sessionStore.getState().session;
+export const setSession = (s: Session): void => sessionStore.getState().setSession(s);
+export const clearSession = (): void => sessionStore.getState().clearSession();
+/** For useSyncExternalStore-style consumers: called after every change of the session. */
+export const subscribe = (listener: () => void): (() => void) => sessionStore.subscribe(listener);
+/** The session in a component; re-renders on sign-in and sign-out. */
+export const useSession = (): Session | null => useStore(sessionStore, (s) => s.session);

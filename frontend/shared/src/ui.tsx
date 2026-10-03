@@ -20,9 +20,9 @@ export function ErrorAlert({ error, onClose }: { error: ApiError | null; onClose
 }
 
 /** A pill: outlined by default, `fill` dark with white text (Confirmed, Sold out, Published), `hatch` striped (Held,
- *  Not yet open), `dim` for a past or cancelled thing. */
-export const Badge = ({ children, solid, fill, hatch, dim, soft }: { children: ReactNode; solid?: boolean; fill?: boolean; hatch?: boolean; dim?: boolean; soft?: boolean }) => (
-  <span className={`badge${solid || fill ? ' fill' : ''}${hatch ? ' hatch' : ''}${dim || soft ? ' dim' : ''}`}>{children}</span>
+ *  Not yet open, Unsaved changes), `dim` for a past or cancelled thing, `ok` green (Saved). */
+export const Badge = ({ children, solid, fill, hatch, dim, soft, ok }: { children: ReactNode; solid?: boolean; fill?: boolean; hatch?: boolean; dim?: boolean; soft?: boolean; ok?: boolean }) => (
+  <span className={`badge${solid || fill ? ' fill' : ''}${hatch ? ' hatch' : ''}${dim || soft ? ' dim' : ''}${ok ? ' ok' : ''}`}>{children}</span>
 );
 
 export const STATUS_LABEL: Record<TableStatusValue, string> = {
