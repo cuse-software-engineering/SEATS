@@ -56,6 +56,11 @@ labelled with the zone letter and the number (`A12`), filled by status as the wi
 (available green, held amber hatch, booked slate, occupied dark); every shape has the accessible name
 `table N, <status>`. One accent colour marks the primary actions, the links and the current sidebar item.
 
+**Not translatable.** Both `index.html` carry `translate="no"` and `<meta name="google" content="notranslate">`: the
+page translator of Chrome (and the like) rewrites the text nodes React manages, and the next update of such a node
+crashes the app with `insertBefore … is not a child of this node` (the "+ New round" button, which gains a spinner
+in front of its label, was the first to hit it). The apps are in English; a Thai UI is a separate piece of work.
+
 ## Routes, features and the screens of Appendix D
 
 | Document screen | Route | Feature folder | Routes called |
