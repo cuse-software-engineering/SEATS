@@ -11,6 +11,7 @@ export default function C9MyBookings() {
       <div className="card">
         {bookings.data && bookings.data.length === 0 && <p className="muted">No booking yet. <Link to="/">Choose a concert round</Link>.</p>}
         {bookings.data && bookings.data.length > 0 && (
+          <div className="table-scroll">{/* the wide table scrolls inside the card on a phone, as C2 does */}
           <table className="data">
             <thead><tr><th>Booking</th><th>Round</th><th>Table</th><th>Party</th><th>Fee</th><th>Status</th><th>Made</th><th></th></tr></thead>
             <tbody>
@@ -32,6 +33,7 @@ export default function C9MyBookings() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
         <div className="row"><button type="button" className="secondary" onClick={bookings.reload}>Refresh</button></div>
       </div>

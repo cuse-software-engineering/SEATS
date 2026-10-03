@@ -6,7 +6,7 @@ export async function loginAsLineUser(page: Page, userId: string): Promise<void>
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'LINE Login (stub, progress 1)' })).toBeVisible();
   await page.getByLabel('LINE user id').fill(userId);
-  await page.getByRole('button', { name: 'Log in with LINE' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();   // the typed id; "Log in with LINE" is the stub button for a fixed demo user
   await expect(page.getByRole('heading', { name: 'Concert rounds' })).toBeVisible();
   await expect(page.locator('.identity')).toContainText(userId);
 }

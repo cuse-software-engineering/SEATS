@@ -5,7 +5,7 @@ test('UC-08 Sign in and sign out', async ({ page }) => {
   // without a session every screen goes to B1
   await page.goto('/rounds');
   await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();   // B1's card heading; the page h1 is hidden by the theme
   await expect(page.locator('.identity')).toHaveText('not signed in');
 
   // a wrong password is refused with the gateway's error
@@ -30,7 +30,7 @@ test('UC-08 Sign in and sign out', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Zone maps' })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/sign-in$/);
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();   // B1's card heading; the page h1 is hidden by the theme
   await expect(page.locator('.identity')).toHaveText('not signed in');
   await expect(page.locator('.notice')).toHaveCount(0);   // the sign-out call succeeded, no local-only notice
 

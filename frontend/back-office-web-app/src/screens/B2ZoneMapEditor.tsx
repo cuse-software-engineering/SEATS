@@ -87,6 +87,7 @@ export default function B2ZoneMapEditor() {
           </div>
           <form className="card" onSubmit={saveType}>
             <h4>Table types (FR-37)</h4>
+            <div className="table-scroll">
             <table className="data">
               <thead><tr><th>Id</th><th>Name</th><th>Seats</th><th>Package</th></tr></thead>
               <tbody>
@@ -97,6 +98,7 @@ export default function B2ZoneMapEditor() {
                 ))}
               </tbody>
             </table>
+            </div>
             <label className="field">Id<input value={tt.id} onChange={(e) => setTt({ ...tt, id: e.target.value })} placeholder="sofa6" /></label>
             <label className="field">Name<input value={tt.name} onChange={(e) => setTt({ ...tt, name: e.target.value })} /></label>
             <label className="field">Capacity<input type="number" min={1} value={tt.capacity} onChange={(e) => setTt({ ...tt, capacity: e.target.value })} /></label>

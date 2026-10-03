@@ -110,6 +110,10 @@ export function updateCustomerProfile(customerId: string, { name, phone }: { nam
 }
 
 // ---------------------------------------------------------------- UC-01 terms and payment
+/** A venue-local wall-clock time for the terms text, printed as the Customer Web App prints times (28 Nov 2026, 18:00). */
+const fmtVenueTime = (iso: string): string =>
+  new Date(iso).toLocaleString('en-GB', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+
 export async function getBookingTerms(id: string, customerId: string) {                             // UC-01 step 13 (FR-12, BRULE-16)
   const b = requireOwnBooking(id, customerId);
   const w = await concertRound.getCheckInWindow(b.roundId);
@@ -117,8 +121,8 @@ export async function getBookingTerms(id: string, customerId: string) {         
     bookingId: id,
     terms: [
       'Full payment confirms the booking; there is no deposit and no balance to pay at the venue.',
-      `Check-in opens at ${w.opensAt} (2 hours before the show).`,
-      `The table is kept until ${w.graceEndsAt} (30 minutes after the start).`,
+      `Check-in opens ${fmtVenueTime(w.opensAt)} (2 hours before the show).`,
+      `The table is kept until ${fmtVenueTime(w.graceEndsAt)} (30 minutes after the start).`,
       'A booking not checked in by then is a no-show and is not refunded.',
     ],
     checkInWindow: w,

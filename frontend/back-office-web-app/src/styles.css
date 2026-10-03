@@ -24,8 +24,8 @@ a { color: var(--ink); }
 .brand { display: flex; align-items: center; gap: 8px; }
 .brand svg { display: block; }
 .brand span { color: var(--ink-3); margin-left: 4px; font-size: 13px; }
-.app-header nav { display: flex; gap: 4px; }
-.app-header nav a { padding: 6px 14px; border-radius: 8px; text-decoration: none; color: var(--ink-2); font-size: 14px; font-weight: 500; transition: background 0.15s; }
+.app-header nav { display: flex; gap: 4px; overflow-x: auto; }
+.app-header nav a { white-space: nowrap; padding: 6px 14px; border-radius: 8px; text-decoration: none; color: var(--ink-2); font-size: 14px; font-weight: 500; transition: background 0.15s; }
 .app-header nav a:hover { background: var(--soft); }
 .app-header nav a.active { background: var(--ink); color: #fff; }
 .identity { margin-left: auto; color: var(--ink-2); font-size: 14px; display: flex; gap: 8px; align-items: center; }
@@ -60,6 +60,7 @@ input, select, textarea { font: inherit; font-size: 14px; padding: 7px 10px; bor
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(17,24,39,0.08); }
 
 /* ── Tables ── */
+.table-scroll { overflow-x: auto; }   /* a wide table scrolls inside its card instead of being clipped */
 table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.data th, table.data td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.data th { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); background: var(--soft); }

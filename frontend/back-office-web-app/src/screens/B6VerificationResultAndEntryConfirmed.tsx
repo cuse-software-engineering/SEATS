@@ -46,7 +46,7 @@ export default function B6VerificationResultAndEntryConfirmed() {
           </table>
         )}
         <div className="row">
-          <button type="button" onClick={confirmEntry} disabled={action.busy || Boolean(checkedIn) || scan.result?.valid === false}>Confirm entry</button>
+          <button type="button" onClick={confirmEntry} disabled={action.busy || Boolean(checkedIn) || !scan.result?.valid}>Confirm entry</button>
           <Link className="btn secondary" to="/check-in">Next scan</Link>
         </div>
       </div>
