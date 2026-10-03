@@ -14,31 +14,33 @@ export default function C2ConcertRounds() {
           <p className="muted">No upcoming round. Publish one in the back-office (B3) or run <code>npm run smoke</code>.</p>
         )}
         {rounds.data && rounds.data.length > 0 && (
-          <table className="data">
-            <thead>
-              <tr><th>Round</th><th>Artist</th><th>Date</th><th>Start</th><th>Booking opens</th><th>Status</th><th></th></tr>
-            </thead>
-            <tbody>
-              {rounds.data.map((r) => (
-                <tr key={r.id}>
-                  <td><strong>{r.name}</strong></td>
-                  <td>{r.artist}</td>
-                  <td>{fmtDate(r.date)}</td>
-                  <td>{fmtDateTime(r.startAt)}</td>
-                  <td>{fmtDateTime(r.bookingOpenAt)}</td>
-                  <td>
-                    {r.status === 'open' && <Badge solid>open · {r.availableTables}/{r.tablesForSale} tables</Badge>}
-                    {r.status === 'not yet open' && <Badge>not yet open</Badge>}
-                    {r.status === 'sold out' && <Badge soft>sold out</Badge>}
-                  </td>
-                  <td>
-                    {r.status === 'open' && <Link className="btn" to={`/rounds/${r.id}`}>Choose a table</Link>}
-                    {r.status === 'not yet open' && <span className="small muted">opens {fmtDateTime(r.bookingOpenAt)}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr><th>Round</th><th>Artist</th><th>Date</th><th>Start</th><th>Booking opens</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                {rounds.data.map((r) => (
+                  <tr key={r.id}>
+                    <td><strong>{r.name}</strong></td>
+                    <td>{r.artist}</td>
+                    <td>{fmtDate(r.date)}</td>
+                    <td>{fmtDateTime(r.startAt)}</td>
+                    <td>{fmtDateTime(r.bookingOpenAt)}</td>
+                    <td>
+                      {r.status === 'open' && <span className="badge open">open · {r.availableTables}/{r.tablesForSale} tables</span>}
+                      {r.status === 'not yet open' && <Badge>not yet open</Badge>}
+                      {r.status === 'sold out' && <Badge soft>sold out</Badge>}
+                    </td>
+                    <td className="actions">
+                      {r.status === 'open' && <Link className="btn" to={`/rounds/${r.id}`}>Choose a table</Link>}
+                      {r.status === 'not yet open' && <span className="small muted">opens {fmtDateTime(r.bookingOpenAt)}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         <div className="row"><button type="button" className="secondary" onClick={rounds.reload}>Refresh</button></div>
       </div>
