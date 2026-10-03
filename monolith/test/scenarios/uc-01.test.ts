@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { expireUnpaidBookings } from '@seats/booking/src/domain.js';
-import { anonymous, call, customer, heldBooking, manager, minutesFromNow, poll, publishedRound, tableStatus } from './harness.js';
+import { anonymous, call, customer, heldBooking, inProcessOnly, manager, minutesFromNow, poll, publishedRound, tableStatus } from './harness.js';
 
 test('UC-01 basic flow Reserve a Specific Table', async () => {
   const { round, day } = await publishedRound();
@@ -164,7 +164,7 @@ test('UC-01 AF-5 Profile Not Completed', async () => {
   assert.equal((await tableStatus(somchai, round.id, 1)).status, 'AVAILABLE');
 });
 
-test('UC-01 EF-1 Hold Expires Before Payment', async () => {
+test('UC-01 EF-1 Hold Expires Before Payment', inProcessOnly('the hold-expiry job runs here with a clock 14 and 16 minutes ahead'), async () => {
   const { round } = await publishedRound();
   const somchai = customer('somchai');
   const held = await heldBooking(somchai, round.id, 1);

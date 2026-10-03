@@ -1,22 +1,33 @@
-// Shared harness of the scenario tests (one file per use case of the project document, Section 2.2): the API
-// Gateway and the six services in this process (ADR-14) on an ephemeral port, the fetch helper with the fake-auth
-// headers of progress 1, and the fixtures that every scenario starts from, built through the REST routes exactly as
-// the Back-office Web App would build them. Each test file is its own process (node --test), so the stores start
-// empty; the rounds of one file get one day each so that the overlap check of validateRound() never fires.
-import { randomUUID } from 'node:crypto';
+// Shared harness of the scenario tests (one file per use case of the project document, Section 2.2): the fetch helper
+// with the fake-auth headers of progress 1 and the fixtures that every scenario starts from, built through the REST
+// routes exactly as the Back-office Web App would build them. Two targets:
+//  - in-process (default, `npm test`): the API Gateway and the six services in this process (ADR-14) on an ephemeral
+//    port; each test file is its own process (node --test), so the stores start empty;
+//  - over the network (`GATEWAY=http://host:4000`, `npm run test:api`): a running system, microservice mode, docker
+//    compose or a deployment; the data persists between files and runs, so every fixture is fresh (its own LINE user,
+//    its own zone map, its own far-future day) and the tests that drive a service from inside the process are skipped.
+import { randomUUID, randomInt } from 'node:crypto';
 import { after, before } from 'node:test';
 import type { AddressInfo } from 'node:net';
-import { wireMonolith } from '../../src/wire.js';
-import { resetStore as resetRounds } from '@seats/concert-round/src/store.js';
-import { resetStore as resetTables } from '@seats/table-availability/src/store.js';
-import { resetStore as resetBookings } from '@seats/booking/src/store.js';
 
-wireMonolith();                                                     // before the route table binds the client methods
-const { createApp } = await import('@seats/gateway/src/app.js');
-const server = createApp().listen(0);
-export const G = () => `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-after(() => server.close());
-before(() => { resetRounds(); resetTables(); resetBookings(); });
+export const GATEWAY = (process.env.GATEWAY ?? '').replace(/\/$/, '');
+export const EXTERNAL = GATEWAY !== '';
+/** The option bag of a scenario that reaches into the process (the hold-expiry job with a shifted clock, an adapter's
+ *  failNext): it runs in-process only and is skipped over the network with the reason in the report. */
+export const inProcessOnly = (why: string) => ({ skip: EXTERNAL ? `in-process only: ${why}` : false });
+
+let url = GATEWAY;
+if (!EXTERNAL) {
+  const { wireMonolith } = await import('../../src/wire.js');
+  wireMonolith();                                                   // before the route table binds the client methods
+  const { createApp } = await import('@seats/gateway/src/app.js');
+  const server = createApp().listen(0);
+  url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const stores = await Promise.all([import('@seats/concert-round/src/store.js'), import('@seats/table-availability/src/store.js'), import('@seats/booking/src/store.js')]);
+  after(() => server.close());
+  before(() => { for (const s of stores) s.resetStore(); });
+}
+export const G = () => url;
 
 // ---------------------------------------------------------------- identities (fake auth, progress 1)
 export type Headers = Record<string, string>;
@@ -42,7 +53,10 @@ export const tableStatus = async (headers: Headers, roundId: string, tableNumber
   (await poll(headers, roundId)).json.tables.find((t: any) => t.tableNumber === tableNumber);
 
 // ---------------------------------------------------------------- dates: random future days as in demo/smoke.mjs, one day per round
-const base = 2 + Math.floor(Math.random() * 300);
+// In-process the stores are empty, so a window of 300 days keeps the overlap check of validateRound() quiet. Over the
+// network the files share one system and earlier runs left their rounds behind, so each process takes a random base in
+// a window of 100,000 days: two processes land on the same day about once in a thousand runs.
+const base = EXTERNAL ? randomInt(2, 100_000) : 2 + Math.floor(Math.random() * 300);
 let days = 0;
 export const futureDay = (): string => new Date(Date.now() + (base + days++) * 864e5).toISOString().slice(0, 10);
 export const at = (day: string, hh: string) => `${day}T${hh}:00:00Z`;

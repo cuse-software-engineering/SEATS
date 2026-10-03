@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { adapters as mediaAdapters, type FakeMediaStorage } from '@seats/concert-round/src/adapters.js';
-import { activeZoneMap, call, customer, defineTableTypes, futureDay, heldBooking, manager, PRICES, publishedRound, schedule, TABLES } from './harness.js';
+import { activeZoneMap, call, customer, defineTableTypes, futureDay, heldBooking, inProcessOnly, manager, PRICES, publishedRound, schedule, TABLES } from './harness.js';
 
 test('UC-04 basic flow Create Venue Zone Map', async () => {
   // steps 1–2: a new, empty map editor
@@ -138,7 +138,7 @@ test('UC-04 EF-1 Validation Fails', async () => {
 });
 
 test.todo('UC-04 EF-2 Zone Map Cannot Be Saved: the in-memory store cannot fail (the retry that finds the Active map is asserted in the basic flow)');
-test('UC-04 EF-3 Zone Map Image Cannot Be Uploaded', async () => {
+test('UC-04 EF-3 Zone Map Image Cannot Be Uploaded', inProcessOnly('the fake media storage is told to refuse the next upload'), async () => {
   const id = (await call(manager, 'POST', '/api/zone-maps', { name: 'Garden stage' })).json.id;
   (mediaAdapters.mediaStorage as FakeMediaStorage).failNext = 1;                       // the object storage refuses the next image
   const failed = await call(manager, 'POST', `/api/zone-maps/${id}/image`, { fileName: 'garden.png' });
