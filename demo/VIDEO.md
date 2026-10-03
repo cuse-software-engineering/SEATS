@@ -26,9 +26,17 @@ at http://localhost:5173, window 3 an incognito window on the customer app for t
 open DevTools (F12), Network tab, filter `api`, tick **Preserve log**, and pick **Fetch/XHR**. Clicking a row shows
 Headers (the identity goes as `x-user-id` and `x-role`, fake auth of progress 1), Payload and Response.
 
-The stores are in memory: a restart of terminal A is a clean slate. Do one dry run, then restart A and record.
-Off camera, before the take: in the back-office, Zone maps, define the two table types in the Table types card
-("2-person round table" capacity 2, "6-person sofa" capacity 6), so the on-camera part starts at the zone map.
+The stores are in memory: a restart of terminal A is a clean slate. Off camera, right before the take, seed the demo
+data through the API in terminal C:
+
+```bash
+npm run demo:seed
+```
+
+It makes three table types, the zone map "Main hall" (Active, two zones, twelve tables), three Published rounds on
+the next three Saturdays and, on the first one, three customers holding tables 1, 5 and 8, so both apps look real
+from the first frame. The holds last 15 minutes (BRULE-02): seed right before recording, and seed again after any
+restart of A. A second run on the same backend changes nothing. Do one dry run, then restart A, seed, record.
 
 ## The storyboard (4:45)
 
@@ -48,11 +56,11 @@ Back-office window, DevTools open. Each click, then the Network row, then the ma
 
 | Click | REST (Network panel) | gRPC (terminal A) |
 |---|---|---|
-| Zone maps, type "Main hall", **+ New map** | `POST /api/zone-maps` 200 | `[round] manager:… CreateZoneMap -> OK` |
+| Zone maps, type "Garden stage", **+ New map** | `POST /api/zone-maps` 200 | `[round] manager:… CreateZoneMap -> OK` |
 | **+ Add zone** "Front stage", **+ Add table** twice (1 sofa, 2 round), **Save** | `PUT /api/zone-maps/:id` 200 | `UpdateZoneMap -> OK` |
 | **Activate** | `POST /api/zone-maps/:id/activate` 200 | `ActivateZoneMap -> OK` |
 | Concert rounds, "Friday Live", **+ New round** | `POST /api/rounds` 200 | `CreateRound -> OK` |
-| artist, date, doors, start, booking opens; zone map; the two prices; **Save draft** | `PUT /api/rounds/:id` 200 | `UpdateRound -> OK` |
+| artist, a weekday date (the seeded rounds take the Saturdays and a published round may not overlap another), doors, start, booking opens; zone map "Garden stage"; the two prices; **Save draft** | `PUT /api/rounds/:id` 200 | `UpdateRound -> OK` |
 | **Validate**, then **Publish** | `POST …/validate`, `POST …/publish` 200 | `[tables] CreateRoundTableStatus -> OK` then `[round] PublishRound -> OK`: one gRPC service calling another |
 | "scratch", **+ New round**, **Discard**, confirm | `DELETE /api/rounds/:id` 200 | `DiscardDraftRound -> OK` |
 
@@ -67,22 +75,24 @@ curl -s -X DELETE -H 'x-user-id: manager-nok' -H 'x-role: manager' localhost:400
 
 ### 2:00 Create Booking: the hold across three services (75 s)
 
-Customer window. Log in with a LINE user id (`U-somchai`, **Allow**), **Select this round**, tap table 1.
+Customer window. Log in with a new LINE user id (`U-nok`, **Allow**; the seeded customers already hold tables),
+**Select this round** on "Saturday Live: The Band", where tables 1, 5 and 8 show as held, and tap table 2. (The
+round published a minute ago works the same; the seeded one shows the map with other customers' holds.)
 
 Terminal A, in this order, one REST call and three gRPC calls:
 
 ```
 [round]    [concert-round] GetRound -> OK (0 ms)
 [tables]   [table-availability] HoldTable -> OK (1 ms)
-[booking]  [booking] customer:U-somchai CreateHeldBooking -> OK (28 ms)
-[gateway]  [gateway] customer:U-somchai POST /api/bookings -> gRPC Bookings/CreateHeldBooking 200 (36 ms)
+[booking]  [booking] customer:U-nok CreateHeldBooking -> OK (28 ms)
+[gateway]  [gateway] customer:U-nok POST /api/bookings -> gRPC Bookings/CreateHeldBooking 200 (36 ms)
 ```
 
 Say: the Booking Service asks the Concert Round Service whether booking is open, takes the table (first lock wins,
 the lock is in its own database, ADR-13) and tells the Table Availability Service, whose map every customer polls
 every two seconds (the `GET …/table-status` rows answered 304 in the Network panel).
 
-Incognito window: log in as `U-malee`, select the round, tap the same table 1: the toast says the table has just
+Incognito window: log in as `U-ploy`, select the same round, tap the same table 2: the toast says the table has just
 been taken, the Network row is 409, the log says `CreateHeldBooking -> FAILED_PRECONDITION the table has just been
 taken by another customer`. Back in the first window: party size 7 (`PUT …/party-size`, the fee), then **Cancel**:
 `[tables] ReleaseHold -> OK` and the table turns available in the other window within two seconds.
@@ -110,6 +120,9 @@ The GitHub contributors graph and the branches; the same backend on Render and t
 
 - The all-curl version of parts 2 and 3 is `demo/rest-demo.sh` (needs jq): the same CRUD and the same booking flow
   as readable calls, with terminal A logging the gRPC behind each.
-- A take goes wrong: Ctrl-C in A, `npm run dev` again, define the table types, record again.
+- A take goes wrong: Ctrl-C in A, `npm run dev` again, `npm run demo:seed`, record again.
+- The deployment instead of localhost: `npm run demo:reset` empties the Render backend and seeds it (needs
+  `DEMO_RESET_TOKEN` from the Render dashboard); the Vercel apps then show the same data, but the service logs are
+  one process there (monolith mode), so the gRPC part of the video needs the local `npm run dev`.
 - The gateway alone with the services in one process is `npm run dev:mono` (ADR-14), but then there is no gRPC on
   the wire and no per-service log: use `npm run dev` for the video.
