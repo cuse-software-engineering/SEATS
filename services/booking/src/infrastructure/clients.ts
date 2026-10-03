@@ -3,6 +3,7 @@
 // (NOT_FOUND, FAILED_PRECONDITION) pass through as gRPC errors for the domain to translate with refusalOf() of
 // @seats/errors. index.ts binds these objects to the domain's ports through delegates, so the monolith's in-process
 // patching and the tests' stubs on the objects themselves are followed.
+import { grpcAddress, grpcDeadlineMs } from '@seats/config/src/index.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import grpc from '@grpc/grpc-js';
@@ -21,11 +22,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const load = (file: string) => grpc.loadPackageDefinition(protoLoader.loadSync(path.resolve(here, '../../../../proto', file), { keepCase: false, longs: Number, defaults: true }));
 const roundPkg = load('concert_round.proto') as unknown as ConcertRoundProto;
 const tablePkg = load('table_availability.proto') as unknown as TableAvailabilityProto;
-const roundClient = new roundPkg.seats.concertround.v1.ConcertRound(process.env.CONCERT_ROUND_GRPC ?? 'localhost:5001', grpc.credentials.createInsecure());
-const tableClient = new tablePkg.seats.tableavailability.v1.TableAvailability(process.env.TABLE_AVAILABILITY_GRPC ?? 'localhost:5003', grpc.credentials.createInsecure());
+const roundClient = new roundPkg.seats.concertround.v1.ConcertRound(grpcAddress('concert-round'), grpc.credentials.createInsecure());
+const tableClient = new tablePkg.seats.tableavailability.v1.TableAvailability(grpcAddress('table-availability'), grpc.credentials.createInsecure());
 const ROUND_SERVICE = 'the Concert Round Service', TABLE_SERVICE = 'the Table Availability Service';
 
-const DEADLINE_MS = 2000;
+const DEADLINE_MS = grpcDeadlineMs();
 const opts = (): grpc.CallOptions => ({ deadline: Date.now() + DEADLINE_MS });
 const promisify = <Res>(system: string, run: (cb: grpc.requestCallback<Res>) => void) =>
   new Promise<Res>((resolve, reject) => run((err, res) => (err ? reject(fromCollaborator(system, err)) : resolve(res as Res))));

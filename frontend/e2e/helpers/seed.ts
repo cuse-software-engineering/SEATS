@@ -2,8 +2,9 @@
 // that the customer tests find a Published round on an Active zone map. Every run uses fresh names, its own table
 // types and free future days (a Published round refuses to overlap another one), so runs never step on each other.
 import { request, type APIRequestContext } from '@playwright/test';
+import { gatewayUrl } from '../../../packages/config/src/index.js';
 
-export const GATEWAY = process.env.GATEWAY ?? 'http://localhost:4000';
+export const GATEWAY = gatewayUrl();
 
 /** A short random tag that makes every name of a run unique. */
 export const tag = (): string => Math.random().toString(36).slice(2, 8);

@@ -11,20 +11,15 @@ import type { ProtoGrpcType as PaymentProto } from '@seats/proto/gen/payment';
 import type { ProtoGrpcType as NotificationProto } from '@seats/proto/gen/notification';
 import type { ProtoGrpcType as StaffAccountProto } from '@seats/proto/gen/staff_account';
 import type { ProtoGrpcType as HealthProto } from '@seats/proto/gen/health';
+import { grpcAddress, grpcDeadlineMs, SERVICES, type ServiceName } from '@seats/config/src/index.js';
 
 const PROTO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../proto');
 const OPTS = { keepCase: false, longs: Number, defaults: true };
 const load = (file: string) => grpc.loadPackageDefinition(protoLoader.loadSync(path.join(PROTO_DIR, file), OPTS));
 const creds = grpc.credentials.createInsecure();
 
-export const ADDRESSES = {
-  'concert-round': process.env.CONCERT_ROUND_GRPC ?? 'localhost:5001',
-  booking: process.env.BOOKING_GRPC ?? 'localhost:5002',
-  'table-availability': process.env.TABLE_AVAILABILITY_GRPC ?? 'localhost:5003',
-  payment: process.env.PAYMENT_GRPC ?? 'localhost:5004',
-  notification: process.env.NOTIFICATION_GRPC ?? 'localhost:5005',
-  'staff-account': process.env.STAFF_ACCOUNT_GRPC ?? 'localhost:5006',
-};
+/** Where each service is, from @seats/config: <SERVICE>_GRPC or localhost and the service's default port. */
+export const ADDRESSES = Object.fromEntries((Object.keys(SERVICES) as ServiceName[]).map((name) => [name, grpcAddress(name)])) as Record<ServiceName, string>;
 
 export const concertRound = new (load('concert_round.proto') as unknown as ConcertRoundProto).seats.concertround.v1.ConcertRound(ADDRESSES['concert-round'], creds);
 export const bookings = new (load('booking.proto') as unknown as BookingProto).seats.booking.v1.Bookings(ADDRESSES.booking, creds);
@@ -37,4 +32,4 @@ const Health = (load('health.proto') as unknown as HealthProto).grpc.health.v1.H
 export const healthOf = Object.fromEntries(Object.entries(ADDRESSES).map(([name, addr]) => [name, new Health(addr, creds)]));
 
 export const SERVICE_NAMES = new Map<object, string>([[concertRound, 'ConcertRound'], [bookings, 'Bookings'], [tableAvailability, 'TableAvailability'], [payment, 'Payment'], [notification, 'Notification'], [staffAccounts, 'StaffAccounts']]);
-export const DEADLINE_MS = Number(process.env.GRPC_DEADLINE_MS ?? 2000);
+export const DEADLINE_MS = grpcDeadlineMs();

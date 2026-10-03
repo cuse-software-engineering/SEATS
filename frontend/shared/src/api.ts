@@ -1,4 +1,4 @@
-// Typed fetch client over the API Gateway, the only REST API (ADR-12). The apps proxy /api to :4000 (vite.config.ts),
+// Typed fetch client over the API Gateway, the only REST API (ADR-12). The apps proxy /api to the gateway (vite.config.ts),
 // so a path is used as is. Sends JSON, adds the fake-auth headers of the session, and throws ApiError
 // {status, error, details} on a non-2xx answer: the gateway's {error, details} body, never swallowed.
 import { getSession } from './session';
@@ -42,7 +42,7 @@ async function send<T>(method: Method, path: string, body?: unknown, extra: Reco
   }
   if (!res.ok && res.status !== 304) {
     if (isErrorBody(json)) throw new ApiError(res.status, json.error, json.details);
-    const hint = res.status >= 500 ? ' (no JSON answer: is the gateway running on :4000? `npm run dev`)' : '';
+    const hint = res.status >= 500 ? ' (no JSON answer: is the API Gateway running? `npm run dev:mono`)' : '';
     throw new ApiError(res.status, `${res.status} ${res.statusText}${hint}`, text.slice(0, 200) || undefined);
   }
   return { status: res.status, etag: res.headers.get('etag'), data: json as T };

@@ -1,6 +1,7 @@
 // gRPC client of the Table Availability Service (ADR-12). Every call carries a deadline; a collaborator that does not
 // answer (down, slow, broken) is an InfrastructureError naming it, while its own refusals pass through for the domain.
 // Implements the TableAvailabilityClient port; the monolith patches this object for in-process calls.
+import { grpcAddress, grpcDeadlineMs } from '@seats/config/src/index.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import grpc from '@grpc/grpc-js';
@@ -15,9 +16,9 @@ import type { TableAvailabilityClient } from '../domain/ports.js';
 
 const PROTO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../proto/table_availability.proto');
 const pkg = grpc.loadPackageDefinition(protoLoader.loadSync(PROTO, { keepCase: false, longs: Number, defaults: true })) as unknown as ProtoGrpcType;
-const client = new pkg.seats.tableavailability.v1.TableAvailability(process.env.TABLE_AVAILABILITY_GRPC ?? 'localhost:5003', grpc.credentials.createInsecure());
+const client = new pkg.seats.tableavailability.v1.TableAvailability(grpcAddress('table-availability'), grpc.credentials.createInsecure());
 
-const DEADLINE_MS = 2000;
+const DEADLINE_MS = grpcDeadlineMs();
 const opts = (): grpc.CallOptions => ({ deadline: Date.now() + DEADLINE_MS });
 const promisify = <Res>(run: (cb: grpc.requestCallback<Res>) => void) =>
   new Promise<Res>((resolve, reject) => run((err, res) => (err ? reject(fromCollaborator('the Table Availability Service', err)) : resolve(res as Res))));

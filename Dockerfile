@@ -6,6 +6,7 @@ ARG SERVICE
 ENV SERVICE=$SERVICE
 COPY package.json tsconfig.base.json ./
 COPY proto/package.json proto/
+COPY packages/config/package.json packages/config/
 COPY packages/errors/package.json packages/errors/
 COPY packages/store/package.json packages/store/
 COPY gateway/package.json gateway/

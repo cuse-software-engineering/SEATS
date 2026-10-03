@@ -68,6 +68,13 @@ demo/rest-demo.sh           # the demo flows as readable curl calls through the 
 demo/grpc-demo.sh           # CRUD on the Table Availability Service with grpcurl
 ```
 
+**Ports and addresses.** No process carries a port or a URL of its own: `packages/config` is the registry. A service
+listens on `GRPC_PORT` or its default (5001 to 5006), a caller finds it at `<SERVICE>_GRPC` or `localhost` and that
+default, the gateway and the monolith listen on `PORT` (4000), scripts and tests call `GATEWAY` (default
+`http://localhost:4000`), the web apps' dev servers take `PORT` (5173, 5174) and proxy `/api` to `API_PROXY` (the
+gateway), and every gRPC call has `GRPC_DEADLINE_MS` (2000). `docker-compose.yml` sets the `*_GRPC` variables to the
+container names; the deployment sets `PORT` and the rewrites. A port that is not a number fails the process at start-up.
+
 ## Test
 
 ```bash

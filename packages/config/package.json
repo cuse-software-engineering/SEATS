@@ -1,0 +1,8 @@
+{
+  "name": "@seats/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The one place that knows where the parts of SEATS run: the registry of the services with their default gRPC ports and the environment variables that override them, the gateway's port and URL, the web apps' ports, the gRPC deadline. Every process reads its addresses from here; nothing else carries a port.",
+  "scripts": { "test": "node --import tsx --test 'test/*.test.ts'", "typecheck": "tsc -p . --noEmit", "build": "tsc -p . --noEmit" }
+}
