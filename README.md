@@ -64,6 +64,8 @@ npm run dev:mono            # the same backend as ONE process on :4000 (ADR-14),
 npm run dev:customer        # the Customer Web App on :5173 (proxies /api to :4000)
 npm run dev:backoffice      # the Back-office Web App on :5174; sign in with manager/manager
 docker compose up --build   # the seven backend processes as containers, compiled with tsc in the image
+npm run demo:seed           # the demo data through the API: three rounds on the next Saturdays, held tables (GATEWAY=… for a deployment)
+npm run demo:reset          # empty the monolith through its reset route (DEMO_RESET_TOKEN on both sides), then demo:seed; --no-seed only empties
 demo/rest-demo.sh           # the demo flows as readable curl calls through the gateway (needs jq)
 demo/grpc-demo.sh           # CRUD on the Table Availability Service with grpcurl
 ```
@@ -72,8 +74,9 @@ demo/grpc-demo.sh           # CRUD on the Table Availability Service with grpcur
 listens on `GRPC_PORT` or its default (5001 to 5006), a caller finds it at `<SERVICE>_GRPC` or `localhost` and that
 default, the gateway and the monolith listen on `PORT` (4000), scripts and tests call `GATEWAY` (default
 `http://localhost:4000`), the web apps' dev servers take `PORT` (5173, 5174) and proxy `/api` to `API_PROXY` (the
-gateway), and every gRPC call has `GRPC_DEADLINE_MS` (2000). `docker-compose.yml` sets the `*_GRPC` variables to the
-container names; the deployment sets `PORT` and the rewrites. A port that is not a number fails the process at start-up.
+gateway), and every gRPC call has `GRPC_DEADLINE_MS` (2000). A test reaches a deployed web app at `CUSTOMER_APP_URL`
+and `BACK_OFFICE_APP_URL`. `docker-compose.yml` sets the `*_GRPC` variables to the container names; the deployment sets
+`PORT` and the rewrites. A port that is not a number fails the process at start-up.
 
 ## Test
 
@@ -81,6 +84,7 @@ container names; the deployment sets `PORT` and the rewrites. A port that is not
 npm test                    # node:test: unit tests of every service, the in-process end-to-end flows and the use case scenarios
 npm run smoke               # the demo flows against the running gateway (npm run dev or dev:mono first): the wire-level check
 npm run test:e2e            # Playwright: the use case scenarios through the real screens (starts the servers it needs)
+npm run test:e2e:deployed   # the same suite on the Vercel apps and the Render backend: reset, run, reset and seed again (DEMO_RESET_TOKEN=…)
 npm run test:api            # the same scenarios over the network against a running gateway (GATEWAY=…, default localhost:4000)
 npm run test:coverage       # the unit, contract and in-process scenario tests under Node's coverage, with thresholds
 npm run typecheck           # tsc on every package; run before a PR
@@ -106,18 +110,30 @@ deployed with `docker-compose.yml`. Live since 30 September 2026:
 
 Both apps rewrite `/api` and `/health` to the Render backend (`frontend/*/vercel.json`); every push to `main` redeploys all three.
 
-The backend sleeps after 15 minutes without traffic and wakes up empty. **Before a demo**, wake and seed it once:
+The backend sleeps after 15 minutes without traffic and wakes up empty. **Before a demo**, empty and seed it in one go:
 
 ```bash
-GATEWAY=https://seats-monolith.onrender.com npm run smoke   # table types, a zone map, a published round, two bookings
+DEMO_RESET_TOKEN=… GATEWAY=https://seats-monolith.onrender.com npm run demo:reset   # three rounds on the next Saturdays, held tables
 ```
+
+`npm run demo:reset` calls `POST /api/admin/reset`, a route the monolith has only when `DEMO_RESET_TOKEN` is set
+(`render.yaml` generates one; read it under *Environment* in the Render dashboard, and `DEMO_RESET_TOKEN=x npm run
+dev:mono` gives a local backend one). It empties the six databases, in memory or on MongoDB, and seeds the staff
+accounts again; then `demo/seed.mjs` makes the demo data through the API as the manager and three customers, as the
+web apps would: three table types, the Active zone map "Main hall" with two zones and twelve tables, three Published
+rounds on the next Saturdays, and on the first round three held tables (Held for the 15 minutes of BRULE-02; Booked
+and Occupied tables need the payment of progress 2). The route is outside the gateway's API and its role model: a
+reset is a store operation, since the business rules rightly refuse to discard a Published round or an Active zone map.
+`npm run demo:seed` alone adds the data to a running backend and does nothing when the rounds are there; `npm run
+smoke` is the quick check, not the seed. The microservices have no reset route: `docker compose down -v`.
+`npm run test:e2e:deployed` uses the same route to run the Playwright suite on the deployment and leave it seeded.
 
 **Backend on Render** (free plan): New → Blueprint → this repository. `render.yaml` creates the web service
 `seats-monolith` from `Dockerfile.monolith`, which runs `monolith/src/server.ts` on the port Render gives it, with
 `/health` as the health check. Its URL is `https://seats-monolith.onrender.com`; if Render has to change the name, put
 the new host into the two `vercel.json` files below. The free plan sleeps after 15 minutes without traffic (the first
 request then takes up to a minute) and keeps the data in memory, so it starts empty after every sleep: seed it with
-`GATEWAY=https://seats-monolith.onrender.com npm run smoke` or through the back-office. The databases can instead
+`npm run demo:reset` as above or through the back-office. The databases can instead
 persist to MongoDB: set `MONGO_URL` on the Render service (e.g. an Atlas free-tier connection string; each service takes
 its own database `seats_<service>` on it, or `<SERVICE>_MONGO_URL` per service) and everything survives a sleep; see
 `packages/store/` and "Inside a service" below.

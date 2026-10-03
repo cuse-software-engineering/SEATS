@@ -9,34 +9,11 @@ import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GATEWAY, waitForGateway } from './gateway.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const GATEWAY = (process.env.GATEWAY ?? 'http://localhost:4000').replace(/\/$/, '');
-const WAIT_MS = Number(process.env.GATEWAY_WAIT_MS ?? 90_000);
-
-async function health() {
-  try {
-    const r = await fetch(`${GATEWAY}/health`, { signal: AbortSignal.timeout(10_000) });
-    const body = await r.json();
-    const down = (body.services ?? []).filter((s) => !s.ok).map((s) => s.service);
-    return { up: r.ok && body.ok === true && down.length === 0, detail: down.length ? `services down: ${down.join(', ')}` : `HTTP ${r.status}` };
-  } catch (e) {
-    return { up: false, detail: e.cause?.code ?? e.name ?? String(e) };
-  }
-}
-
-const started = Date.now();
-let last;
-for (;;) {
-  last = await health();
-  if (last.up) break;
-  if (Date.now() - started > WAIT_MS) {
-    console.error(`no healthy gateway at ${GATEWAY} after ${Math.round(WAIT_MS / 1000)} s (${last.detail}); start one with npm run dev, npm run dev:mono or docker compose up, or set GATEWAY`);
-    process.exit(2);
-  }
-  await new Promise((r) => setTimeout(r, 3000));
-}
-console.log(`scenarios over the network against ${GATEWAY} (healthy after ${Math.round((Date.now() - started) / 1000)} s)\n`);
+const seconds = await waitForGateway();
+console.log(`scenarios over the network against ${GATEWAY} (healthy after ${seconds} s)\n`);
 
 const dir = join(ROOT, 'monolith', 'test', 'scenarios');
 const files = readdirSync(dir).filter((f) => f.endsWith('.test.ts')).sort().map((f) => join(dir, f));

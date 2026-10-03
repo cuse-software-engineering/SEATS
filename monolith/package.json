@@ -20,7 +20,8 @@
     "@seats/notification": "*",
     "@seats/payment": "*",
     "@seats/staff-account": "*",
-    "@seats/table-availability": "*"
+    "@seats/table-availability": "*",
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@seats/proto": "*",

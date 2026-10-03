@@ -9,12 +9,13 @@
 //   Payment Service               GRPC_PORT       5004        PAYMENT_GRPC
 //   Notification Service          GRPC_PORT       5005        NOTIFICATION_GRPC
 //   Staff Account Service         GRPC_PORT       5006        STAFF_ACCOUNT_GRPC
-//   Customer Web App (Vite)       PORT            5173        proxies /api and /health to the gateway (API_PROXY)
-//   Back-office Web App (Vite)    PORT            5174        proxies /api and /health to the gateway (API_PROXY)
+//   Customer Web App (Vite)       PORT            5173        CUSTOMER_APP_URL    http://localhost:5173; proxies /api and /health to API_PROXY
+//   Back-office Web App (Vite)    PORT            5174        BACK_OFFICE_APP_URL http://localhost:5174; proxies /api and /health to API_PROXY
 //
 // docker-compose.yml sets the *_GRPC variables to the container names; the monolith (ADR-14) needs none of the gRPC
-// addresses; the deployment (Render, Vercel) sets PORT and the rewrites. The databases are configured by @seats/store
-// (<SERVICE>_MONGO_URL, MONGO_URL).
+// addresses; the deployment (Render, Vercel) sets PORT and the rewrites, and a test or a script reaches it through
+// GATEWAY, CUSTOMER_APP_URL and BACK_OFFICE_APP_URL. The databases are configured by @seats/store (<SERVICE>_MONGO_URL,
+// MONGO_URL). DEMO_RESET_TOKEN, when set, gives the monolith its demo reset route (monolith/src/admin.ts).
 
 export type ServiceName = 'concert-round' | 'booking' | 'table-availability' | 'payment' | 'notification' | 'staff-account';
 
@@ -67,3 +68,9 @@ export const gatewayUrl = (): string => (env('GATEWAY') ?? `http://localhost:${g
 export const webAppPort = (app: 'customer' | 'back-office'): number => int('PORT', app === 'customer' ? DEFAULTS.customerAppPort : DEFAULTS.backOfficeAppPort);
 /** Where a web app's dev server proxies /api and /health: API_PROXY, else the gateway's default URL. */
 export const apiProxyTarget = (): string => env('API_PROXY') ?? `http://localhost:${DEFAULTS.gatewayPort}`;
+/** Where a browser, or Playwright, finds a web app: CUSTOMER_APP_URL or BACK_OFFICE_APP_URL (a deployment), else the dev server on localhost. */
+export const webAppUrl = (app: 'customer' | 'back-office'): string =>
+  (env(app === 'customer' ? 'CUSTOMER_APP_URL' : 'BACK_OFFICE_APP_URL') ?? `http://localhost:${webAppPort(app)}`).replace(/\/$/, '');
+
+/** The token that enables POST /api/admin/reset of the monolith, the demo reset; unset means there is no such route. */
+export const demoResetToken = (): string | undefined => env('DEMO_RESET_TOKEN');

@@ -14,3 +14,5 @@ services:
         value: production
       - key: EXPIRY_JOB_MS
         value: "5000"
+      - key: DEMO_RESET_TOKEN      # enables POST /api/admin/reset for `npm run demo:reset`; read the generated value in the dashboard
+        generateValue: true

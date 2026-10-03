@@ -45,6 +45,14 @@ process on :4000), `npm run dev:customer` (:5173) and `npm run dev:backoffice` (
 stops what it started. Two projects: `customer` (`uc-01`, `uc-09`) and `backoffice` (`uc-03`, `uc-04`, `uc-08`).
 Traces and screenshots are kept for failed tests only (`frontend/e2e/test-results/`, git-ignored).
 
+**Against the deployment.** `npm run test:e2e:deployed` (repo root) runs the same suite on the Vercel apps with the
+Render backend: it empties the demo through the monolith's reset route first (`DEMO_RESET_TOKEN`, see "Deploy" in the
+root README), runs the tests, and empties and seeds the demo again at the end. The config starts nothing for a URL it
+is given: `GATEWAY`, `CUSTOMER_APP_URL` and `BACK_OFFICE_APP_URL` name the running system, all three set by the
+script, or any other deployment, or the local servers to try the mechanism. The seed helper reaches the gateway
+directly; the screens reach it through the app's `/api` rewrite, as a user's browser does. A dev server the config
+starts proxies `/api` to that same gateway.
+
 **Naming rule**: one file per use case (`tests/uc-NN.spec.ts`) and every test is named exactly
 `<UC id> <flow id> <flow title>` as the document names the flow, for example `UC-01 AF-3 Table Just Taken by Another
 Customer` or `UC-03 basic flow Create Concert Round`; the backend traceability script matches on that prefix. The
