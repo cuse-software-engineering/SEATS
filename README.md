@@ -68,6 +68,7 @@ npm run demo:seed           # the demo data through the API: three rounds on the
 npm run demo:reset          # empty the monolith through its reset route (DEMO_RESET_TOKEN on both sides), then demo:seed; --no-seed only empties
 demo/rest-demo.sh           # the demo flows as readable curl calls through the gateway (needs jq)
 demo/grpc-demo.sh           # CRUD on the Table Availability Service with grpcurl
+demo/VIDEO.md               # the runbook of the deliverable 3 video: what to click, what each terminal shows
 ```
 
 **Ports and addresses.** No process carries a port or a URL of its own: `packages/config` is the registry. A service

@@ -14,11 +14,12 @@ export async function createHeldBooking(customerId: string, { roundId, tableNumb
   const table = round.tables.find((t) => t.tableNumber === tableNumber && t.forSale);
   if (!table) throw new DomainError('not_found', `table ${tableNumber} is not for sale in this round`);
   const id = randomUUID();
-  const holdEndsAt = iso(Date.now() + round.holdPeriodMinutes * 60e3);                       // BRULE-02
+  const now = Date.now();                                                                    // one clock read: the hold ends holdPeriodMinutes after the moment it was created
+  const holdEndsAt = iso(now + round.holdPeriodMinutes * 60e3);                             // BRULE-02
   // First lock wins (BRULE-03, ADR-13): the booking is the truth. The lock is an insert on the table's key: in memory
   // and in MongoDB (the unique _id index) exactly one of several concurrent inserts succeeds (NFR-20).
   if (!(await ports.tableLock.acquire(roundId, tableNumber as number, id))) throw new DomainError('conflict', 'the table has just been taken by another customer');   // AF-3
-  const b: Booking = { id, customerId, roundId, tableNumber: tableNumber as number, zoneId: table.zoneId, zoneName: table.zoneName, tableTypeId: table.tableTypeId, capacity: table.capacity, status: 'Held', holdEndsAt, partySize: null, fee: null, termsAccepted: false, createdAt: iso(Date.now()), history: [{ status: 'Held', at: iso(Date.now()), by: customerId }] };
+  const b: Booking = { id, customerId, roundId, tableNumber: tableNumber as number, zoneId: table.zoneId, zoneName: table.zoneName, tableTypeId: table.tableTypeId, capacity: table.capacity, status: 'Held', holdEndsAt, partySize: null, fee: null, termsAccepted: false, createdAt: iso(now), history: [{ status: 'Held', at: iso(now), by: customerId }] };
   await ports.bookings.save(b);
   try {
     await ports.tableAvailability.holdTable({ roundId, tableNumber: tableNumber as number, bookingId: id, holdEndsAt });   // the read model follows
