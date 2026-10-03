@@ -1,7 +1,7 @@
 // SEATS — gRPC API of the Booking Service: its only API (ADR-12). The API Gateway maps the customer and staff routes
 // of docs/contracts.md onto it and passes the caller in the metadata x-user-id and x-role; the Payment Service calls
 // ConfirmBookingPayment (progress 2). The booking is the source of truth of the hold (ADR-13).
-// Owner: Peat SE.
+// Owners: docs/team.md.
 syntax = "proto3";
 
 package seats.booking.v1;

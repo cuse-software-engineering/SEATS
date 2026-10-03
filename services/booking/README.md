@@ -1,4 +1,4 @@
-# Booking Service (owner: Peat SE)
+# Booking Service
 
 The booking context: the booking from Held to Checked-in, the customer profile, the booking terms and the e-ticket
 (Booking DB). The booking is the source of truth of the hold: at most one active booking per table per round, enforced by

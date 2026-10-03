@@ -94,8 +94,10 @@ deployed with `docker-compose.yml`. Live since 30 September 2026:
 | What | URL | Note |
 |---|---|---|
 | Backend (monolith on Render) | https://seats-monolith.onrender.com | `/health` lists the six services |
-| Customer Web App (Vercel) | https://seats-r94r.vercel.app | type any LINE user id on the first screen |
-| Back-office Web App (Vercel) | https://seats-kappa.vercel.app | sign in with `manager/manager` |
+| Customer Web App (Vercel) | https://seats-customer.vercel.app | type any LINE user id on the first screen |
+| Back-office Web App (Vercel) | https://seats-back-office.vercel.app | sign in with `manager/manager`; also `door1/door1`, `owner/owner` |
+
+Both apps rewrite `/api` and `/health` to the Render backend (`frontend/*/vercel.json`); every push to `main` redeploys all three.
 
 The backend sleeps after 15 minutes without traffic and wakes up empty. **Before a demo**, wake and seed it once:
 

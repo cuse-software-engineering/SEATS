@@ -12,7 +12,7 @@ ER diagram (this file)  ->  src/domain/model.ts of the service  the entities as 
 
 Change the diagram first, then `model.ts`, then the `.proto` (and `npm run proto`), then `contracts.md`.
 
-## Concert Round Service — Round DB (owner: Natchy)
+## Concert Round Service — Round DB
 
 ```mermaid
 erDiagram
@@ -81,7 +81,7 @@ Stored as documents: a zone map is one document with its zones and tables embedd
 its check-in window and the snapshot of the parameters. What crosses to other services: `Round` (with the tables of its
 map, joined for the caller), `RoundPricing`, `CheckInWindow` (`proto/concert_round.proto`).
 
-## Table Availability Service — Table Status DB (owner: Will)
+## Table Availability Service — Table Status DB
 
 ```mermaid
 erDiagram
@@ -103,7 +103,7 @@ One document per round with its tables embedded: the read model of the table map
 the hold in its own database and then reports each transition here; `holdTable()` is one conditional update of the
 document. The gRPC messages are this model one to one.
 
-## Booking Service — Booking DB (owner: Peat SE)
+## Booking Service — Booking DB
 
 ```mermaid
 erDiagram

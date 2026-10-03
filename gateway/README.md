@@ -1,4 +1,4 @@
-# API Gateway (owner: Will)
+# API Gateway
 
 REST :4000. The only component the Frontend calls and the only REST API of the system (Figure 5.1, ADR-12). It
 authenticates the caller, checks the role of the route (FR-66) and makes one gRPC call to the service that owns the

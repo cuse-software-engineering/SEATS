@@ -1,6 +1,6 @@
 // SEATS — gRPC API of the Concert Round Service: its only API (ADR-12). The API Gateway maps the back-office and
 // customer routes of docs/contracts.md onto it; the Booking Service calls GetRound, GetRoundPricing, GetCheckInWindow.
-// Owner: Natchy. Changing a message here changes the gateway and the Booking Service too: tell their owners.
+// Owners: docs/team.md. Changing a message here changes the gateway and the Booking Service too: tell their owners.
 // The "REST service with CRUD" of Deliverable 3 is the gateway's REST API over this service: zone maps and rounds are
 // created (Create…), read (Get…/List…), updated (Update…) and deleted (DiscardDraft…).
 syntax = "proto3";

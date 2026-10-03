@@ -3,7 +3,7 @@
 // per round, ADR-13) and reports every transition here. The whole API is gRPC (the only REST call is the polled read).
 // It is the "gRPC service with CRUD" of Deliverable 3: C = CreateRoundTableStatus, R = Get/Count,
 // U = HoldTable / ReleaseHold / MarkTableBooked / MarkTableOccupied, D = RemoveRoundTableStatus.
-// Owner: Will. Callers: Concert Round Service (publish, counts, booked tables) and Booking Service (holds).
+// Owners: docs/team.md. Callers: Concert Round Service (publish, counts, booked tables) and Booking Service (holds).
 syntax = "proto3";
 
 package seats.tableavailability.v1;

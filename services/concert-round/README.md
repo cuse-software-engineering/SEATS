@@ -1,4 +1,4 @@
-# Concert Round Service (owner: Natchy)
+# Concert Round Service
 
 The venue and events context: zone maps, table types, concert rounds, package prices and the business parameters
 (Round DB). Its only API is gRPC :5001 (`proto/concert_round.proto`): the gateway maps the back-office and customer

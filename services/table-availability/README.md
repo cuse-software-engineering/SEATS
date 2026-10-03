@@ -1,4 +1,4 @@
-# Table Availability Service (owner: Will)
+# Table Availability Service
 
 Keeps the read model of the table map: the status of every table of every published round (Table Status DB), created
 when a round is published and updated by the Booking Service after each booking transition (ADR-13). The hold itself
