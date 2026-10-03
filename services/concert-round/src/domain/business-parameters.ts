@@ -15,7 +15,7 @@ export async function updateBusinessParameters(patch: Partial<BusinessParameters
   for (const k of Object.keys(DEFAULT_PARAMETERS) as (keyof BusinessParameters)[]) {
     const v = patch[k];
     if (v === undefined) continue;
-    if (!Number.isFinite(v) || v < 0) throw new DomainError('invalid', `${k} must be a non-negative number`);
+    if (!Number.isInteger(v) || v < 0) throw new DomainError('invalid', `${k} must be a non-negative whole number`);   // minutes, hours, THB: integers (data model)
     p[k] = v;
   }
   return ports.businessParameters.save(p);

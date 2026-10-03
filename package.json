@@ -23,7 +23,8 @@
     "dev:mono": "npm -w monolith run dev",
     "test:e2e": "npm -w frontend/e2e run e2e",
     "test:api": "node scripts/test-api.mjs",
-    "check:layers": "node scripts/check-layers.mjs"
+    "check:layers": "node scripts/check-layers.mjs",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage --test-coverage-include='services/**/src/**' --test-coverage-include='packages/**/src/**' --test-coverage-include='gateway/src/**' --test-coverage-include='monolith/src/**' --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=80 services/*/test/*.test.ts packages/*/test/*.test.ts gateway/test/*.test.ts monolith/test/*.test.ts monolith/test/scenarios/*.test.ts"
   },
   "devDependencies": {
     "@grpc/proto-loader": "^0.7.13",

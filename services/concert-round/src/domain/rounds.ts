@@ -56,14 +56,20 @@ export async function validateRound(id: string): Promise<ValidationResult> {    
   const t = (v: string) => (v ? new Date(v).getTime() : NaN);
   if (!r.date || !r.startAt || !r.doorsOpenAt || !r.bookingOpenAt) problems.push('date, doors-open time, start time and booking-open time are required');
   else {
-    if (!(t(r.doorsOpenAt) < t(r.startAt))) problems.push('the doors-open time must be before the start time');
-    if (!(t(r.bookingOpenAt) < t(r.startAt))) problems.push('the booking-open time must be before the start time');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date) || Number.isNaN(Date.parse(r.date))) problems.push('the date must be a calendar date, YYYY-MM-DD');
+    const malformed = ([['doors-open', r.doorsOpenAt], ['start', r.startAt], ['booking-open', r.bookingOpenAt]] as const).filter(([, v]) => Number.isNaN(t(v))).map(([k]) => k);
+    for (const k of malformed) problems.push(`the ${k} time is not a valid timestamp`);                 // EF-1: the field is marked
+    if (malformed.length === 0) {
+      if (!(t(r.doorsOpenAt) < t(r.startAt))) problems.push('the doors-open time must be before the start time');
+      if (!(t(r.bookingOpenAt) < t(r.startAt))) problems.push('the booking-open time must be before the start time');
+    }
   }
   const map = await ports.zoneMaps.get(r.zoneMapId);
   if (!map) problems.push('the round has no zone map');
   else if (map.status !== 'Active') problems.push('the zone map is not Active');
   for (const tb of (await tablesOf(r)).filter((x) => x.forSale)) {
     if (tb.packagePrice === null) problems.push(`no package price for ${tb.tableTypeName || tb.tableTypeId} in ${tb.zoneName || tb.zoneId}`);
+    else if (!(tb.packagePrice >= 0)) problems.push(`the package price for ${tb.tableTypeName || tb.tableTypeId} in ${tb.zoneName || tb.zoneId} must not be negative`);   // BRULE-08: a THB amount
   }
   if (r.startAt && r.doorsOpenAt) {
     const mine = [t(r.doorsOpenAt), r.checkInWindow ? t(r.checkInWindow.graceEndsAt) : t(r.startAt)];

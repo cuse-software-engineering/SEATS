@@ -60,12 +60,13 @@ export const getSession = (token: string): Promise<Session | null> => ports.sess
 
 // ---------------------------------------------------------------- staff accounts (manager): C R U D
 export async function createStaffAccount({ username, role, password }: { username?: string; role?: string; password?: string }): Promise<StaffAccountView> {
-  if (!username?.trim()) throw new DomainError('invalid', 'username is required');
+  const name = username?.trim() ?? '';                                                            // the stored name: the duplicate check uses the same one
+  if (!name) throw new DomainError('invalid', 'username is required');
   const r = requireRole(role);
   const p = requirePassword(password);
-  if (await ports.accounts.byUsername(username)) throw new DomainError('conflict', `username ${username} is taken`);
+  if (await ports.accounts.byUsername(name)) throw new DomainError('conflict', `username ${name} is taken`);
   const salt = randomBytes(16).toString('hex');
-  const a: StaffAccount = { staffAccountId: randomUUID(), username: username.trim(), role: r, status: 'Active', passwordSalt: salt, passwordHash: hash(p, salt), createdAt: iso(Date.now()) };
+  const a: StaffAccount = { staffAccountId: randomUUID(), username: name, role: r, status: 'Active', passwordSalt: salt, passwordHash: hash(p, salt), createdAt: iso(Date.now()) };
   return view(await ports.accounts.insert(a));
 }
 

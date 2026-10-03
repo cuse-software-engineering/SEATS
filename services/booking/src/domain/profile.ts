@@ -28,7 +28,7 @@ export async function createCustomerProfile(customerId: string, { name, phone, c
 
 export async function updateCustomerProfile(customerId: string, { name, phone }: { name?: string; phone?: string }): Promise<CustomerProfile> {   // UC-09 steps 6–7
   const p = await getCustomerProfile(customerId);
-  const next: CustomerProfile = { ...p, name: name ?? p.name, phone: phone ?? p.phone };
+  const next: CustomerProfile = { ...p, name: name?.trim() ?? p.name, phone: phone ?? p.phone };   // stored as createCustomerProfile() stores it
   const problems = validProfile(next);
   if (problems.length) throw new DomainError('invalid', 'invalid profile', problems);
   return ports.profiles.save(next);

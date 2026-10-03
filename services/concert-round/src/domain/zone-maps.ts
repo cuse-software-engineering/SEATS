@@ -2,7 +2,7 @@
 // Storage Adapter, FR-39), its zones and tables (steps 4–7), is validated (S-1, FR-74) and activated (steps 11–12);
 // an Active map keeps every table a published round has booked (AF-1). A Draft can be discarded.
 import { randomUUID } from 'node:crypto';
-import { DomainError, InfrastructureError } from '@seats/errors/src/index.js';
+import { DomainError, InfrastructureError, refusalOf } from '@seats/errors/src/index.js';
 import { ports } from './ports.js';
 import { iso, now, requireZoneMap, tableTypesById, zoneSummary, type ZoneMapView } from './shared.js';
 import type { ValidationResult, Zone, ZoneMap, ZoneMapStatus, ZoneMapTable } from './model.js';
@@ -29,7 +29,8 @@ export async function uploadZoneMapImage(id: string, { fileName }: { fileName?: 
 async function bookedTablesOfMap(mapId: string): Promise<Set<number>> {
   const numbers = new Set<number>();
   for (const r of await ports.rounds.publishedOnMap(mapId)) {
-    const status = await ports.tableAvailability.getRoundTableStatus(r.id).catch(() => ({ tables: [] }));
+    // a round without a table map yet has no bookings; a collaborator that does not answer is not swallowed (AF-1 step 3 must be checked)
+    const status = await ports.tableAvailability.getRoundTableStatus(r.id).catch((e: unknown) => { if (refusalOf(e) === 'not_found') return { tables: [] }; throw e; });
     for (const t of status.tables) if (['BOOKED', 'OCCUPIED'].includes(t.status)) numbers.add(t.tableNumber);
   }
   return numbers;

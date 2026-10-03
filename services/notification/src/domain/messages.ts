@@ -32,7 +32,7 @@ async function attempt(m: Message): Promise<Message> {
 }
 
 async function send(kind: NotificationKind, req: NotificationRequest): Promise<NotificationResult> {
-  if (!req.customerId || !req.bookingId) throw new DomainError('invalid', 'customerId and bookingId are required');
+  if (!req.customerId || !req.bookingId || !req.roundName || !Number.isInteger(req.tableNumber)) throw new DomainError('invalid', 'customerId, bookingId, roundName and tableNumber are required');   // the text names the table and the round
   const m: Message = { messageId: randomUUID(), customerId: req.customerId, bookingId: req.bookingId, kind, text: TEXT[kind](req), delivered: false, attempts: 0, lastError: '', sentAt: iso(Date.now()) };
   await attempt(m);
   return { messageId: m.messageId, delivered: m.delivered };

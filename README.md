@@ -75,6 +75,7 @@ npm test                    # node:test: unit tests of every service, the in-pro
 npm run smoke               # the demo flows against the running gateway (npm run dev or dev:mono first): the wire-level check
 npm run test:e2e            # Playwright: the use case scenarios through the real screens (starts the servers it needs)
 npm run test:api            # the same scenarios over the network against a running gateway (GATEWAY=…, default localhost:4000)
+npm run test:coverage       # the unit, contract and in-process scenario tests under Node's coverage, with thresholds
 npm run typecheck           # tsc on every package; run before a PR
 npm run proto               # regenerate proto/gen/ after a change to a .proto file (commit the result)
 node scripts/test-traceability.mjs   # docs/test-traceability.md: every use case scenario and the test that covers it
@@ -83,7 +84,7 @@ node scripts/test-traceability.mjs   # docs/test-traceability.md: every use case
 The unit tests stub the collaborators and test `domain.ts` alone. The scenario tests (`monolith/test/scenarios/`)
 drive each basic, alternative and exception flow of the use cases through the gateway with the services in-process,
 named by the flow they cover (`UC-01 AF-3 Table Just Taken by Another Customer`). The Playwright suite
-(`frontend/e2e/`) does the same through the screens. `npm run test:api` runs the same scenario files over the network against whatever runs at `GATEWAY`: the seven processes of `npm run dev`, `docker compose up`, `dev:mono` or a deployment; the scenarios that drive a service from inside the process (the hold-expiry job with a shifted clock, a failing fake adapter) are skipped and listed. The smoke test is the quick wire-level demo.
+(`frontend/e2e/`) does the same through the screens. `npm run test:api` runs the same scenario files over the network against whatever runs at `GATEWAY`: the seven processes of `npm run dev`, `docker compose up`, `dev:mono` or a deployment; the scenarios that drive a service from inside the process (the hold-expiry job with a shifted clock, a failing fake adapter) are skipped and listed. The smoke test is the quick wire-level demo. [docs/test-design.md](docs/test-design.md) describes the techniques: equivalence classes with boundaries, state-transition matrices, decision tables, the concurrency and authorization scenarios, the doubles, and the coverage thresholds.
 
 ## Deploy
 

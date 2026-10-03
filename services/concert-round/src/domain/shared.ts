@@ -31,6 +31,7 @@ export const zoneSummary = (map: ZoneMap): ZoneSummary[] => map.zones.map((z) =>
 export function deriveCheckInWindow(startAt: string, p: BusinessParameters): CheckInWindow | null {       // UC-03 step 5 (BRULE-04, BRULE-05)
   if (!startAt) return null;
   const s = new Date(startAt).getTime();
+  if (Number.isNaN(s)) return null;                                                                    // a malformed start: validateRound names it (EF-1)
   return { opensAt: iso(s - p.checkInWindowHours * 3600e3), startAt: iso(s), graceEndsAt: iso(s + p.gracePeriodMinutes * 60e3) };
 }
 

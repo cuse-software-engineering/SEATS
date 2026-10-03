@@ -81,6 +81,7 @@ export async function acceptBookingTerms(id: string, customerId: string): Promis
 
 export async function startPayment(id: string, customerId: string): Promise<never> {               // UC-01 step 15 — Payment Service, progress 2
   const b = await requireOwnBooking(id, customerId);
+  if (b.status !== 'Held') throw new DomainError('conflict', `the booking is ${b.status}`);                 // only a held table is paid for
   if (!b.termsAccepted || b.fee === null) throw new DomainError('conflict', 'party size, fee and accepted terms are needed before paying');
   return notImplemented('startPayment()');
 }
