@@ -16,6 +16,13 @@ const HTTP_STATUS: Partial<Record<grpc.status, number>> = {
   [grpc.status.UNAVAILABLE]: 502, [grpc.status.DEADLINE_EXCEEDED]: 504,
 };
 
+/** Two log lines per request: `req` when it arrives (its number, who, the route and the gRPC method behind it) and `res`
+ *  when it is answered (the status, the time taken, the gRPC status and message on a refusal). The number counts the
+ *  requests of this process since it started, so the lines of one request pair up among those of the services. */
+let seq = 0;
+const clock = () => { const d = new Date(); return `${d.toTimeString().slice(0, 8)}.${String(d.getMilliseconds()).padStart(3, '0')}`; };
+const line = (n: number, what: string) => console.log(`[gateway] #${n} ${clock()} ${what}`);
+
 const unary = <Res>(run: (cb: grpc.requestCallback<Res>) => void) =>
   new Promise<Res>((resolve, reject) => run((err, res) => (err ? reject(err) : resolve(res as Res))));
 
@@ -41,27 +48,29 @@ async function identify(req: Request): Promise<{ userId: string; role: Role | ''
 
 const handle = (route: Route) => async (req: Request, res: Response) => {
   const { userId, role } = await identify(req);
+  const n = ++seq, started = Date.now();
+  line(n, `req ${role || 'anonymous'}:${userId || '-'} ${req.method} ${req.originalUrl} -> gRPC ${route.label}`);
+  const log = (status: number, note?: string) => line(n, `res ${req.method} ${req.originalUrl} ${status} (${Date.now() - started} ms)${note ? ` ${note}` : ''}`);
   if (route.auth !== 'none') {
-    if (!userId || !role) { res.status(401).json({ error: 'no identity: send a LINE ID token as Authorization: Bearer, or the headers x-user-id and x-role (fake auth, progress 1)' }); return; }
-    if (!route.roles.includes(role)) { res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
+    if (!userId || !role) { log(401); res.status(401).json({ error: 'no identity: send a LINE ID token as Authorization: Bearer, or the headers x-user-id and x-role (fake auth, progress 1)' }); return; }
+    if (!route.roles.includes(role)) { log(403, `role ${role} may not`); res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
   }
   const metadata = new grpc.Metadata();
   if (userId) metadata.set('x-user-id', userId);
   if (role) metadata.set('x-role', role);
-  const started = Date.now();
   try {
     const request = route.request({ params: req.params as Record<string, string>, query: req.query as Record<string, string | undefined>, body: req.body ?? {}, header: (name) => req.get(name) });
     const out = await unary<any>((cb) => route.call(request, metadata, { deadline: Date.now() + DEADLINE_MS }, cb));
     const etag = route.etag?.(out);
-    if (etag !== undefined && req.get('if-none-match') === etag) { log(req, route, 304, started, role, userId); res.status(304).end(); return; }
+    if (etag !== undefined && req.get('if-none-match') === etag) { log(304); res.status(304).end(); return; }
     if (etag !== undefined) res.set('ETag', etag);
-    log(req, route, 200, started, role, userId);
+    log(200);
     res.json(route.pick ? route.pick(out) : out);
   } catch (e) {
     if (!isGrpcServiceError(e)) {                                   // a defect in the gateway itself: logged with its stack, answered with a reference only
       const ref = randomUUID().slice(0, 8);
       console.error(`[gateway] [defect ${ref}]`, e instanceof Error ? e.stack ?? e.message : e);
-      log(req, route, 500, started, role, userId);
+      log(500, `defect ${ref}`);
       res.status(500).json({ error: `internal error (ref ${ref})` });
       return;
     }
@@ -69,14 +78,12 @@ const handle = (route: Route) => async (req: Request, res: Response) => {
     const status = HTTP_STATUS[err.code] ?? 500;
     const raw = err.metadata?.get('error-details-bin')[0];
     const details = raw ? JSON.parse(raw.toString()) : undefined;
-    log(req, route, status, started, role, userId, err.code === grpc.status.UNAVAILABLE ? err.message : undefined);
+    log(status, err.code === grpc.status.UNAVAILABLE ? err.message : `${grpc.status[err.code]} ${err.details ?? err.message}`);
     const unreachable = status === 502 && details === undefined;   // a connection failure; an UNAVAILABLE with details is the service's own answer (an external system refused)
     res.status(status).json({ error: unreachable ? `the service behind ${req.path} is not reachable` : err.details ?? err.message, ...(details !== undefined ? { details } : {}) });
   }
 };
 
-const log = (req: Request, route: Route, status: number, started: number, role: string, userId: string, note?: string) =>
-  console.log(`[gateway] ${role || 'anonymous'}:${userId || '-'} ${req.method} ${req.originalUrl} -> gRPC ${route.label} ${status} (${Date.now() - started} ms)${note ? ` ${note}` : ''}`);
 
 /** The gateway as an Express app: JSON body, health, one handler per route, JSON 404. */
 export function createApp(): express.Express {

@@ -17,7 +17,7 @@ Three terminals, side by side with Chrome:
 
 | Terminal | Command | Shows |
 |---|---|---|
-| A, the widest | `npm run dev` | the seven processes with coloured prefixes: `[gateway]` logs every REST request and the gRPC method behind it, `[round]`, `[tables]`, `[booking]` … log every gRPC call they serve |
+| A, the widest | `npm run dev` | the seven processes with coloured prefixes. Every process logs two lines per call, `req` when it arrives and `res` when it is answered, each with the call's number in that process (from 1 at every restart) and the time to the millisecond: `[gateway]` the REST request and the gRPC method behind it, `[round]`, `[tables]`, `[booking]` … the gRPC calls they serve. The lines of nested calls interleave, so a request's `req` and `res` enclose the calls it caused |
 | B | `npm run dev:backoffice` then `npm run dev:customer` (two tabs, or `&`) | the two web apps on :5174 and :5173, proxying `/api` to the gateway |
 | C | the scripts of parts 2 and 4 | `curl` and `grpcurl` |
 
@@ -76,17 +76,17 @@ Back-office window, DevTools open. Each click, then the Network row, then the ma
 
 | Click | REST (Network panel) | gRPC (terminal A) |
 |---|---|---|
-| Zone maps, type "Garden stage", **+ New map** | `POST /api/zone-maps` 200 | `[round] manager:… CreateZoneMap -> OK` |
-| **+ Add zone** "Front stage", **+ Add table** twice (1 sofa, 2 round), **Save** | `PUT /api/zone-maps/:id` 200 | `UpdateZoneMap -> OK` |
-| **Activate** | `POST /api/zone-maps/:id/activate` 200 | `ActivateZoneMap -> OK` |
-| Concert rounds, "Friday Live", **+ New round** | `POST /api/rounds` 200 | `CreateRound -> OK` |
-| artist, a weekday date (the seeded rounds take the Saturdays and a published round may not overlap another), doors, start, booking opens; zone map "Garden stage"; the two prices; **Save draft** | `PUT /api/rounds/:id` 200 | `UpdateRound -> OK` |
-| **Validate**, then **Publish** | `POST …/validate`, `POST …/publish` 200 | `[tables] CreateRoundTableStatus -> OK` then `[round] PublishRound -> OK`: one gRPC service calling another |
-| "scratch", **+ New round**, **Discard**, confirm | `DELETE /api/rounds/:id` 200 | `DiscardDraftRound -> OK` |
+| Zone maps, type "Garden stage", **+ New map** | `POST /api/zone-maps` 200 | `[round] #n … req manager:… CreateZoneMap` then `res CreateZoneMap OK` |
+| **+ Add zone** "Front stage", **+ Add table** twice (1 sofa, 2 round), **Save** | `PUT /api/zone-maps/:id` 200 | `UpdateZoneMap` req and res |
+| **Activate** | `POST /api/zone-maps/:id/activate` 200 | `ActivateZoneMap` req and res |
+| Concert rounds, "Friday Live", **+ New round** | `POST /api/rounds` 200 | `CreateRound` req and res |
+| artist, a weekday date (the seeded rounds take the Saturdays and a published round may not overlap another), doors, start, booking opens; zone map "Garden stage"; the two prices; **Save draft** | `PUT /api/rounds/:id` 200 | `UpdateRound` req and res |
+| **Validate**, then **Publish** | `POST …/validate`, `POST …/publish` 200 | `[round] req PublishRound`, inside it `[tables] req` and `res CreateRoundTableStatus OK`, then `[round] res PublishRound OK`: one gRPC service calling another |
+| "scratch", **+ New round**, **Discard**, confirm | `DELETE /api/rounds/:id` 200 | `DiscardDraftRound` req and res |
 
 Say at the publish: the Concert Round Service creates the table map of the round in the Table Availability Service,
-service to service over gRPC, which is why `[tables]` logs before `[round]`. Say at the delete: a published round
-refuses it with 409 (the log says `FAILED_PRECONDITION only a Draft round can be discarded`), which you can show by
+service to service over gRPC, which is why the `[tables]` pair sits between the `req` and the `res` of `[round]`. Say at the delete: a published round
+refuses it with 409 (the `res` line says `FAILED_PRECONDITION only a Draft round can be discarded`), which you can show by
 clicking Discard on the published one if there is time; the UI hides the button, so use C:
 
 ```bash
@@ -99,13 +99,17 @@ Customer window. Log in with a new LINE user id (`U-nok`, **Allow**; the seeded 
 **Select this round** on "Saturday Live: The Band", where tables 1, 5 and 8 show as held, and tap table 2. (The
 round published a minute ago works the same; the seeded one shows the map with other customers' holds.)
 
-Terminal A, in this order, one REST call and three gRPC calls:
+Terminal A, in this order, one REST request and three gRPC calls nested in it (the numbers are per process):
 
 ```
-[round]    [concert-round] GetRound -> OK (0 ms)
-[tables]   [table-availability] HoldTable -> OK (1 ms)
-[booking]  [booking] customer:U-nok CreateHeldBooking -> OK (28 ms)
-[gateway]  [gateway] customer:U-nok POST /api/bookings -> gRPC Bookings/CreateHeldBooking 200 (36 ms)
+[gateway]  [gateway] #17 17:03:30.038 req customer:U-nok POST /api/bookings -> gRPC Bookings/CreateHeldBooking
+[booking]  [booking] #1 17:03:30.041 req customer:U-nok CreateHeldBooking
+[round]    [concert-round] #16 17:03:30.055 req GetRound
+[round]    [concert-round] #16 17:03:30.056 res GetRound OK (0 ms)
+[tables]   [table-availability] #4 17:03:30.069 req HoldTable
+[tables]   [table-availability] #4 17:03:30.070 res HoldTable OK (1 ms)
+[booking]  [booking] #1 17:03:30.072 res CreateHeldBooking OK (31 ms)
+[gateway]  [gateway] #17 17:03:30.077 res POST /api/bookings 200 (39 ms)
 ```
 
 Say: the Booking Service asks the Concert Round Service whether booking is open, takes the table (first lock wins,
@@ -113,9 +117,9 @@ the lock is in its own database, ADR-13) and tells the Table Availability Servic
 every two seconds (the `GET …/table-status` rows answered 304 in the Network panel).
 
 Incognito window: log in as `U-ploy`, select the same round, tap the same table 2: the toast says the table has just
-been taken, the Network row is 409, the log says `CreateHeldBooking -> FAILED_PRECONDITION the table has just been
-taken by another customer`. Back in the first window: party size 7 (`PUT …/party-size`, the fee), then **Cancel**:
-`[tables] ReleaseHold -> OK` and the table turns available in the other window within two seconds.
+been taken, the Network row is 409, the `[booking] res` line says `CreateHeldBooking FAILED_PRECONDITION the table has just
+been taken by another customer` and the gateway's `res` line ends with the same words after its 409. Back in the first window: party size 7 (`PUT …/party-size`, the fee), then **Cancel**:
+`[tables] req ReleaseHold` and `res ReleaseHold OK` and the table turns available in the other window within two seconds.
 
 ### 3:15 gRPC CRUD directly on the Table Availability Service (60 s)
 
@@ -127,7 +131,7 @@ demo/grpc-demo.sh
 
 Health check, then C `CreateRoundTableStatus`, R `GetRoundTableStatus` and `CountAvailableTables`, U `HoldTable` (the
 second hold is refused with FAILED_PRECONDITION), `MarkTableBooked`, `MarkTableOccupied`, D `RemoveRoundTableStatus`
-refused while a table is booked, `ReleaseHold` idempotent. Terminal A logs each call with no caller: nothing came
+refused while a table is booked, `ReleaseHold` idempotent. Terminal A logs each call as a `req` and `res` pair with no caller: nothing came
 through the gateway. Say: the contract is the `.proto` file, which grpcurl reads; the same methods the Booking Service
 called a minute ago.
 

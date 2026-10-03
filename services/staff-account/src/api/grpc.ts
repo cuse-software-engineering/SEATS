@@ -17,15 +17,18 @@ const pkg = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(PROTO_DIR,
 const health = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(PROTO_DIR, 'health.proto'), OPTS)) as unknown as HealthProto;
 
 const ctxOf = (md: grpc.Metadata): CallContext => ({ caller: md.get('x-user-id')[0]?.toString(), role: md.get('x-role')[0]?.toString() });
-/** One line per call, like the gateway's: who called which method and how it ended (the caller is the identity the
- *  gateway authenticated; a call from another service carries none). */
-const log = (name: string, ctx: CallContext, started: number, outcome: string) =>
-  console.log(`[staff-account] ${ctx.role ? `${ctx.role}:${ctx.caller ?? '-'} ` : ''}${name} -> ${outcome} (${Date.now() - started} ms)`);
+/** Two log lines per call, like the gateway's: `req` when it arrives (its number, the caller the gateway authenticated,
+ *  none for a call from another service or from grpcurl, the method) and `res` when it ends (OK, or the gRPC status and
+ *  the message, and the time taken). The number counts the calls of this process since it started. */
+let seq = 0;
+const clock = () => { const d = new Date(); return `${d.toTimeString().slice(0, 8)}.${String(d.getMilliseconds()).padStart(3, '0')}`; };
+const line = (n: number, what: string) => console.log(`[staff-account] #${n} ${clock()} ${what}`);
 const unary = (name: string, fn: (request: any, ctx: CallContext) => unknown): grpc.handleUnaryCall<any, any> => (call, callback) => {
-  const ctx = ctxOf(call.metadata), started = Date.now();
+  const ctx = ctxOf(call.metadata), started = Date.now(), n = ++seq;
+  line(n, `req ${ctx.role ? `${ctx.role}:${ctx.caller ?? '-'} ` : ''}${name}`);
   Promise.resolve().then(() => fn(call.request, ctx)).then(
-    (res) => { log(name, ctx, started, 'OK'); callback(null, res); },
-    (e: unknown) => { const err = toServiceError(e); log(name, ctx, started, `${grpc.status[err.code]} ${err.details}`); callback(err); },
+    (res) => { line(n, `res ${name} OK (${Date.now() - started} ms)`); callback(null, res); },
+    (e: unknown) => { const err = toServiceError(e); line(n, `res ${name} ${grpc.status[err.code]} ${err.details} (${Date.now() - started} ms)`); callback(err); },
   );
 };
 const handlers = Object.fromEntries(Object.entries(api).map(([name, fn]) => [name, unary(name, fn as (request: any, ctx: CallContext) => unknown)])) as unknown as StaffAccountsHandlers;
