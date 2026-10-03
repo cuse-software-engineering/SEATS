@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { clearSession, useSession } from '@seats/frontend-shared';
+import { clearSession, SeatsLogo, useSession } from '@seats/frontend-shared';
 
 /** The app bar of every screen (Appendix D): a back chevron, the bold title, a right slot (the hold countdown on
  *  C4 to C7) and, once logged in, the ⋮ menu with the two screens LINE's rich menu would open and Log out; then the
@@ -21,6 +21,7 @@ export function Screen({ title, back, right, children, padTop }: { title: ReactN
     <>
       <header className="appbar">
         {back && <Link to={back} className="back" aria-label="Back">‹</Link>}
+        <SeatsLogo className="logo" height={14} />
         <h1>{title}</h1>
         <span className="right">{right}</span>
         {session && (

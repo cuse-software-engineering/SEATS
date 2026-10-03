@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api, ErrorAlert, setSession, type StaffRole, type StaffSession, useAction } from '@seats/frontend-shared';
+import { api, ErrorAlert, SeatsLogo, setSession, type StaffRole, type StaffSession, useAction } from '@seats/frontend-shared';
 
 const ROLES: StaffRole[] = ['manager', 'front_staff', 'owner'];
 
@@ -34,7 +34,7 @@ export default function B1SignIn() {
   return (
     <div className="signin-page">
       <form className="signin" onSubmit={signIn}>
-        <h1 className="title">SEATS back-office</h1>
+        <h1 className="title"><SeatsLogo className="logo" height={22} /> back-office</h1>
         <div className="muted" style={{ marginBottom: 12 }}>Sign in with your staff account</div>
         {notice && <div className="notice">{notice}</div>}
         <ErrorAlert error={action.error} onClose={action.clear} />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { api, clearSession, toApiError, useSession } from '@seats/frontend-shared';
+import { api, clearSession, SeatsLogo, toApiError, useSession } from '@seats/frontend-shared';
 
 /** The shell of every screen, as the wireframes of Appendix D draw it: the dark top bar with the app name and the
  *  signed-in account, the left sidebar with one item per screen (Business parameters and Staff accounts both open
@@ -27,7 +27,7 @@ export default function App() {
     <>
       <header className="topbar">
         {session && <button type="button" className="burger" aria-label="Menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>☰</button>}
-        SEATS back-office
+        <span className="brand"><SeatsLogo className="logo" height={18} /> back-office</span>
         <span className="who identity" title={session ? `role ${session.role}` : undefined}>
           {session ? `signed in as ${session.label ?? session.userId}` : 'not signed in'}
         </span>

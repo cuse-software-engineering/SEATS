@@ -17,6 +17,8 @@ code { font-family: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, 
 .appbar { height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid #bbb; background: #f5f5f5; position: sticky; top: 0; z-index: 2; }
 .appbar h1 { font-size: 16px; font-weight: 700; margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .appbar .back { font-size: 20px; color: #444; font-weight: 400; text-decoration: none; line-height: 1; flex: none; }
+.appbar .logo { flex: none; color: #222; margin-right: -2px; }
+.appbar .avatar { width: 28px; height: 28px; border-radius: 50%; flex: none; }
 .appbar .right { margin-left: auto; flex: none; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
 .appbar .tiny { margin-left: 6px; }
 .appbar .menu { position: relative; flex: none; margin-right: -6px; }

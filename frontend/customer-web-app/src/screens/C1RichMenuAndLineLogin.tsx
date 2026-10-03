@@ -27,6 +27,7 @@ export default function C1RichMenuAndLineLogin() {
     <div className="line-chat">
       <header className="appbar">
         <span className="back" aria-hidden="true">‹</span>
+        <img className="avatar" src={VENUE.logoUrl} alt="" />
         <h1>{VENUE.name}</h1>
         <span className="tiny">Official Account</span>
       </header>

@@ -17,6 +17,9 @@ ul { margin: 0; padding-left: 18px; }
 .topbar { flex: none; height: 44px; background: var(--bar); color: #fff; display: flex; align-items: center; padding: 0 16px; font-weight: 700; font-size: 16px; gap: 12px; }
 .topbar .burger { display: none; border: 0; background: none; color: #fff; font: inherit; font-size: 20px; line-height: 1; padding: 4px 6px; margin-left: -6px; cursor: pointer; border-radius: 6px; }
 .topbar .burger[aria-expanded="true"] { background: rgba(255, 255, 255, .18); }
+.topbar .brand { display: inline-flex; align-items: center; gap: 7px; }
+.topbar .logo, .signin .logo { vertical-align: -2px; }
+.signin .title .logo { margin-right: 4px; }
 .topbar .who { margin-left: auto; font-weight: 400; font-size: 12.5px; color: #ddd; white-space: nowrap; }
 .wbody { display: flex; flex: 1; min-height: 0; }
 .nav { width: 180px; flex: none; background: #f0f0f0; border-right: 1px solid #bbb; padding: 8px 0; font-size: 14px; display: flex; flex-direction: column; }
