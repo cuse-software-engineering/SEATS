@@ -38,6 +38,24 @@ the next three Saturdays and, on the first one, three customers holding tables 1
 from the first frame. The holds last 15 minutes (BRULE-02): seed right before recording, and seed again after any
 restart of A. A second run on the same backend changes nothing. Do one dry run, then restart A, seed, record.
 
+### Recording from a GitHub Codespace
+
+The processes run in the Codespace; Chrome runs on your machine, so the two app ports must be forwarded. Only 5173
+and 5174 are needed: the dev servers proxy `/api` to the gateway inside the Codespace, and the curl and grpcurl
+calls run in its terminals.
+
+- **VS Code desktop attached to the Codespace** (the simplest): the ports forward themselves when the servers start
+  and appear as `localhost:5173` and `localhost:5174` on your machine, so every URL in this runbook works unchanged,
+  the incognito window included. If one is missing, the Ports panel (**Ports** tab next to the terminal, or
+  **Forward a Port**) adds it.
+- **The browser-based editor**: the Ports panel gives `https://<codespace>-5173.app.github.dev` and `…-5174…` instead
+  of localhost; the Vite configs allow that name. A private port asks the browser to sign in to GitHub, which the
+  incognito window cannot do with your cookie: set the two ports to **Public** for the take (right-click the port,
+  Port Visibility), and back to Private afterwards.
+
+Terminal A, B and C are then the Codespace's terminals, and the screen recorder captures Chrome and VS Code on your
+machine.
+
 ## The storyboard (4:45)
 
 ### 0:00 The architecture (30 s)
