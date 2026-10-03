@@ -7,6 +7,7 @@ Service (progress 2); no route of the gateway reaches it.
 In progress 1 the LINE Messaging Adapter is a stub: each notice is recorded in the store and written to the log as
 `[notification] LINE push to <customer_id>: <kind>`, and the result says delivered. The LINE Messaging API comes later.
 
-- `src/domain.ts` — `sendBookingConfirmation()`, `sendHoldExpiredNotice()`, `sendPaymentFailedNotice()`.
-- `src/store.ts` — in-memory store (swap for Mongoose, ADR-06).
+- `src/domain.ts` — `sendBookingConfirmation()`, `sendHoldExpiredNotice()`, `sendPaymentFailedNotice()`, `retryFailedMessages()`.
+- `src/repository.ts` — `MessageRepository`, the domain's view of the Notification DB (`messages`).
+- `src/store.ts` — the Notification DB: in memory, or MongoDB by configuration (ADR-06).
 - `src/model.ts`, `src/grpc.ts`, `src/server.ts` — transport only.

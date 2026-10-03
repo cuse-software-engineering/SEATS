@@ -4,12 +4,12 @@ import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as d from '../src/domain.js';
 import { adapters, LoggingLineMessaging } from '../src/adapters.js';
-import { collection, resetStore } from '../src/store.js';
-import type { Message } from '../src/model.js';
+import { messages } from '../src/repository.js';
+import { resetStore } from '../src/store.js';
+import type { DomainErrorKind } from '@seats/errors/src/index.js';
 
-const rejected = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const rejected = (p: Promise<unknown>, kind: DomainErrorKind) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const REQUEST = { customerId: 'U-somchai', bookingId: 'b1', roundName: 'Friday Live', tableNumber: 5 };
-const messages = collection<Message>('messages');
 let line: LoggingLineMessaging;
 const quiet = <T>(fn: () => Promise<T>): Promise<T> => { const log = console.log, warn = console.warn; console.log = () => {}; console.warn = () => {}; return fn().finally(() => { console.log = log; console.warn = warn; }); };
 
@@ -28,9 +28,9 @@ describe('the three notices', () => {
     assert.deepEqual(line.pushed.map((p) => [p.userId, p.kind]), [['U-somchai', 'BookingConfirmation'], ['U-somchai', 'HoldExpiredNotice'], ['U-somchai', 'PaymentFailedNotice']]);
   }));
   test('a notice needs the customer and the booking', () => quiet(async () => {
-    await rejected(d.sendBookingConfirmation({ ...REQUEST, customerId: '' }), 400);
-    await rejected(d.sendHoldExpiredNotice({ ...REQUEST, bookingId: undefined }), 400);
-    assert.deepEqual([line.pushed, await messages.list()], [[], []]);
+    await rejected(d.sendBookingConfirmation({ ...REQUEST, customerId: '' }), 'invalid');
+    await rejected(d.sendHoldExpiredNotice({ ...REQUEST, bookingId: undefined }), 'invalid');
+    assert.deepEqual([line.pushed, await messages.all()], [[], []]);
   }));
 });
 

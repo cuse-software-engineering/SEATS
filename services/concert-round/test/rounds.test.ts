@@ -7,7 +7,7 @@ import { tableAvailability } from '../src/clients.js';
 import { resetStore } from '../src/store.js';
 import type { CreateRoundTableStatusRequest } from '@seats/proto/gen/seats/tableavailability/v1/CreateRoundTableStatusRequest';
 
-const refused = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const refused = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const PAST = '2026-01-01T00:00:00.000Z';
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);   // a future date; validateRound refuses overlaps
 let created: CreateRoundTableStatusRequest[] = [];
@@ -76,7 +76,7 @@ describe('updateRound', () => {
 describe('publishRound', () => {
   test('refuses an invalid round with the problems as details', async () => {
     const r = await d.createRound();
-    await assert.rejects(d.publishRound(r.id), (e: unknown) => e instanceof d.DomainError && e.status === 400 && Array.isArray(e.details) && e.details.length > 0);
+    await assert.rejects(d.publishRound(r.id), (e: unknown) => e instanceof d.DomainError && e.kind === 'invalid' && Array.isArray(e.details) && e.details.length > 0);
     assert.equal(created.length, 0);
   });
   test('sets Published, snapshots the parameters and creates the table status once', async () => {
@@ -101,12 +101,12 @@ describe('discardDraftRound', () => {
   test('removes a Draft and refuses a Published round', async () => {
     const draft = await d.createRound();
     assert.deepEqual(await d.discardDraftRound(draft.id), { removed: true });
-    await refused(d.getRound(draft.id), 404);
+    await refused(d.getRound(draft.id), 'not_found');
     const map = await activeMap();
     const r = await d.createRound();
     await d.updateRound(r.id, fullRound(map, 3));
     await d.publishRound(r.id);
-    await refused(d.discardDraftRound(r.id), 409);
+    await refused(d.discardDraftRound(r.id), 'conflict');
   });
 });
 
@@ -135,9 +135,9 @@ describe('getUpcomingRounds', () => {
 describe('getCheckInWindow', () => {
   test('needs a start time', async () => {
     const r = await d.createRound();
-    await refused(d.getCheckInWindow(r.id), 409);
+    await refused(d.getCheckInWindow(r.id), 'conflict');
     await d.updateRound(r.id, { startAt: '2026-12-24T20:00:00Z' });
     assert.equal((await d.getCheckInWindow(r.id)).roundId, r.id);
-    await refused(d.updateRound('nope', {}), 404);
+    await refused(d.updateRound('nope', {}), 'not_found');
   });
 });

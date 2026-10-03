@@ -5,8 +5,8 @@ import * as d from '../src/domain.js';
 import { adapters, SimulatedPaymentGateway, type PaymentGatewayAdapter } from '../src/adapters.js';
 import { resetStore } from '../src/store.js';
 
-const refused = (fn: () => Promise<unknown>, status: number) => assert.rejects(fn, (e: unknown) => e instanceof d.DomainError && e.status === status);
-const rejected = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const refused = (fn: () => Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(fn, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
+const rejected = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const REQUEST = { bookingId: 'b1', amount: 7800, customerId: 'U-somchai' };
 let gateway: SimulatedPaymentGateway;
 
@@ -20,10 +20,10 @@ describe('createPaymentRequest', () => {
     assert.deepEqual(await d.getPaymentStatus({ paymentId: r.paymentId }), { paymentId: r.paymentId, bookingId: 'b1', status: 'Pending', amount: 7800 });
   });
   test('validates the request before touching the gateway', async () => {
-    await rejected(d.createPaymentRequest({ ...REQUEST, bookingId: '' }), 400);
-    await rejected(d.createPaymentRequest({ ...REQUEST, customerId: undefined }), 400);
-    await rejected(d.createPaymentRequest({ ...REQUEST, amount: 0 }), 400);
-    await rejected(d.createPaymentRequest({ ...REQUEST, amount: 12.5 }), 400);
+    await rejected(d.createPaymentRequest({ ...REQUEST, bookingId: '' }), 'invalid');
+    await rejected(d.createPaymentRequest({ ...REQUEST, customerId: undefined }), 'invalid');
+    await rejected(d.createPaymentRequest({ ...REQUEST, amount: 0 }), 'invalid');
+    await rejected(d.createPaymentRequest({ ...REQUEST, amount: 12.5 }), 'invalid');
     assert.equal(gateway.checkouts.length, 0);
   });
   test('any adapter serves: a test double that answers another URL', async () => {
@@ -49,19 +49,19 @@ describe('receivePaymentResult', () => {
   });
   test('the signature is checked by the adapter: a wrong one, an unknown status, a mismatched amount and an unknown payment are refused', async () => {
     const { paymentId } = await d.createPaymentRequest(REQUEST);
-    await refused(() => d.receivePaymentResult({ ...gateway.signedResult(paymentId, 'Paid', 7800), signature: 'sim-other' }), 400);
-    await refused(() => d.receivePaymentResult({ ...gateway.signedResult(paymentId, 'Paid', 7800), signature: '' }), 400);
-    await refused(() => d.receivePaymentResult(gateway.signedResult(paymentId, 'Done' as 'Paid', 7800)), 400);
-    await refused(() => d.receivePaymentResult(gateway.signedResult(paymentId, 'Paid', 7200)), 409);
-    await refused(() => d.receivePaymentResult(gateway.signedResult('nope', 'Paid', 7800)), 404);
-    await refused(() => d.receivePaymentResult({ status: 'Paid', amount: 7800, signature: 'sim-' }), 400);
+    await refused(() => d.receivePaymentResult({ ...gateway.signedResult(paymentId, 'Paid', 7800), signature: 'sim-other' }), 'invalid');
+    await refused(() => d.receivePaymentResult({ ...gateway.signedResult(paymentId, 'Paid', 7800), signature: '' }), 'invalid');
+    await refused(() => d.receivePaymentResult(gateway.signedResult(paymentId, 'Done' as 'Paid', 7800)), 'invalid');
+    await refused(() => d.receivePaymentResult(gateway.signedResult(paymentId, 'Paid', 7200)), 'conflict');
+    await refused(() => d.receivePaymentResult(gateway.signedResult('nope', 'Paid', 7800)), 'not_found');
+    await refused(() => d.receivePaymentResult({ status: 'Paid', amount: 7800, signature: 'sim-' }), 'invalid');
     assert.equal((await d.getPaymentStatus({ paymentId })).status, 'Pending');
   });
 });
 
 describe('getPaymentStatus', () => {
   test('an unknown payment is not found', async () => {
-    await refused(() => d.getPaymentStatus({ paymentId: 'nope' }), 404);
-    await refused(() => d.getPaymentStatus({}), 404);
+    await refused(() => d.getPaymentStatus({ paymentId: 'nope' }), 'not_found');
+    await refused(() => d.getPaymentStatus({}), 'not_found');
   });
 });

@@ -10,7 +10,7 @@ import type { TableRef } from '@seats/proto/gen/seats/tableavailability/v1/Table
 import type { HoldTableRequest } from '@seats/proto/gen/seats/tableavailability/v1/HoldTableRequest';
 import type { TableStatus__Output } from '@seats/proto/gen/seats/tableavailability/v1/TableStatus';
 
-const rejected = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const rejected = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const SOMCHAI = 'U-somchai', MALEE = 'U-malee';
 const PAST = '2026-01-01T00:00:00.000Z';
 const table = (tableNumber: number, forSale = true) => ({ tableNumber, zoneId: 'A', zoneName: 'Zone A', tableTypeId: tableNumber === 1 ? 'sofa6' : 'round2', tableTypeName: '', capacity: tableNumber === 1 ? 6 : 2, forSale, x: 0, y: 0, packagePrice: tableNumber === 1 ? 7200 : 2400, packageContent: '' });
@@ -45,7 +45,7 @@ describe('createHeldBooking', () => {
   });
   test('a second hold on the same table by another customer is refused: the first lock wins', async () => {
     await d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 });
-    await rejected(d.createHeldBooking(MALEE, { roundId: 'r1', tableNumber: 1 }), 409);
+    await rejected(d.createHeldBooking(MALEE, { roundId: 'r1', tableNumber: 1 }), 'conflict');
     assert.equal(holds.length, 1);
     assert.equal((await d.getCustomerBookings(MALEE)).length, 0);
     await d.createHeldBooking(MALEE, { roundId: 'r1', tableNumber: 2 });                      // another table is fine
@@ -53,21 +53,21 @@ describe('createHeldBooking', () => {
   });
   test('a round that is not open is refused', async () => {
     concertRound.getRound = async () => round({ bookingOpenAt: new Date(Date.now() + 3600e3).toISOString() });
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 409);
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 'conflict');
     concertRound.getRound = async () => round({ status: 'Draft' });
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 409);
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 'conflict');
     assert.equal(holds.length, 0);
   });
   test('an unknown round, a table not for sale and a bad request', async () => {
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 3 }), 404);
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 42 }), 404);
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1' }), 400);
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 3 }), 'not_found');
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 42 }), 'not_found');
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1' }), 'invalid');
     concertRound.getRound = async () => { throw Object.assign(new Error('not found'), { code: GRPC_STATUS.NOT_FOUND }); };
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'nope', tableNumber: 1 }), 404);
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'nope', tableNumber: 1 }), 'not_found');
   });
   test('when the read model refuses the hold the booking is dropped', async () => {
     tableAvailability.holdTable = async () => { throw Object.assign(new Error('HELD'), { code: GRPC_STATUS.FAILED_PRECONDITION }); };
-    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 409);
+    await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 'conflict');
     assert.deepEqual(await d.getCustomerBookings(SOMCHAI), []);
   });
 });
@@ -82,19 +82,19 @@ describe('setPartySize', () => {
   });
   test('validates the party size, the owner and the state', async () => {
     const b = await d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 });
-    await rejected(d.setPartySize(b.id, SOMCHAI, { partySize: 0 }), 400);
-    await rejected(d.setPartySize(b.id, SOMCHAI, { partySize: 2.5 }), 400);
-    await rejected(d.setPartySize(b.id, MALEE, { partySize: 2 }), 404);
+    await rejected(d.setPartySize(b.id, SOMCHAI, { partySize: 0 }), 'invalid');
+    await rejected(d.setPartySize(b.id, SOMCHAI, { partySize: 2.5 }), 'invalid');
+    await rejected(d.setPartySize(b.id, MALEE, { partySize: 2 }), 'not_found');
     concertRound.getRoundPricing = async (roundId) => ({ roundId, prices: [], extraPersonFee: 600 });
-    await rejected(d.setPartySize(b.id, SOMCHAI, { partySize: 2 }), 409);                      // no package price for the table
+    await rejected(d.setPartySize(b.id, SOMCHAI, { partySize: 2 }), 'conflict');                      // no package price for the table
   });
 });
 
 describe('getBooking', () => {
   test('another customer gets 404, not 403 (FR-40)', async () => {
     const b = await d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 });
-    await rejected(d.getBooking(b.id, MALEE), 404);
-    await rejected(d.getBooking('nope', SOMCHAI), 404);
+    await rejected(d.getBooking(b.id, MALEE), 'not_found');
+    await rejected(d.getBooking('nope', SOMCHAI), 'not_found');
     assert.deepEqual((await d.getCustomerBookings(SOMCHAI)).map((x) => x.id), [b.id]);
     assert.deepEqual((await d.getRoundBookings('r1')).map((x) => x.id), [b.id]);
   });
@@ -106,10 +106,10 @@ describe('terms and payment', () => {
     const terms = await d.getBookingTerms(b.id, SOMCHAI);
     assert.equal(terms.checkInWindow.graceEndsAt, '2026-12-24T20:30:00.000Z');
     assert.equal(terms.terms.length, 4);
-    await rejected(d.startPayment(b.id, SOMCHAI), 409);                                         // no fee, no accepted terms yet
+    await rejected(d.startPayment(b.id, SOMCHAI), 'conflict');                                         // no fee, no accepted terms yet
     assert.equal((await d.acceptBookingTerms(b.id, SOMCHAI)).termsAccepted, true);
     await d.setPartySize(b.id, SOMCHAI, { partySize: 2 });
-    await rejected(d.startPayment(b.id, SOMCHAI), 501);
+    await rejected(d.startPayment(b.id, SOMCHAI), 'not_implemented');
   });
 });
 
@@ -121,8 +121,8 @@ describe('cancelBooking', () => {
     assert.equal(c.remainingHoldSeconds, 0);
     assert.deepEqual(c.history.map((h) => [h.status, h.by]), [['Held', SOMCHAI], ['Cancelled', SOMCHAI]]);
     assert.deepEqual(releases, [{ roundId: 'r1', tableNumber: 1, bookingId: b.id }]);
-    await rejected(d.cancelBooking(b.id, SOMCHAI), 409);                                        // already Cancelled
-    await rejected(d.cancelBooking(b.id, MALEE), 404);
+    await rejected(d.cancelBooking(b.id, SOMCHAI), 'conflict');                                        // already Cancelled
+    await rejected(d.cancelBooking(b.id, MALEE), 'not_found');
     assert.equal((await d.createHeldBooking(MALEE, { roundId: 'r1', tableNumber: 1 })).status, 'Held');   // the table is free again
   });
 });

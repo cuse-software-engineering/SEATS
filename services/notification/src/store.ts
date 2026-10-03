@@ -7,7 +7,7 @@ export type { Collection } from '@seats/store/src/index.js';
 export { DuplicateKeyError } from '@seats/store/src/index.js';
 
 export const store = serviceStore('notification');
-/** A collection handle of this service's database; domain.ts takes its handles at module load. */
+/** A collection handle of this service's database; repository.ts takes its handle at module load. */
 export const collection = store.collection;
 /** Chooses the implementation from the configuration; server.ts and the monolith call it before serving. */
 export const connectStore = store.connect;

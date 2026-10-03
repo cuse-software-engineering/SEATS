@@ -8,7 +8,10 @@ gateway for the customer and staff routes (`docs/contracts.md`) with the caller 
 gRPC client of the Concert Round Service (GetRound, GetRoundPricing, GetCheckInWindow) and of the Table Availability
 Service (HoldTable, ReleaseHold, MarkTableBooked, MarkTableOccupied). Its own job expires unpaid holds every 5 s (ADR-08).
 
-- `src/domain.ts` — one function per operation of Table 5.3; the progress 2 operations answer UNIMPLEMENTED.
-- `src/grpc.ts` — the server: one handler per operation, DomainError mapped to a gRPC status.
-- `src/clients.ts` — the two gRPC clients, each call with a deadline.
-- `src/store.ts` — in-memory store (swap for Mongoose, ADR-06).
+- `src/domain/` — one function per operation of Table 5.3, one file per use case (`booking.ts` UC-01, `expiry.ts` UC-01 EF-1,
+  `profile.ts` UC-09, `progress2.ts` answers UNIMPLEMENTED); `src/domain.ts` is the barrel the callers import.
+- `src/repository.ts` — one repository per aggregate (bookings, profiles) plus the table lock, over `Collection<T>`.
+- `src/api.ts` — the API layer, one function per method of the proto; `src/grpc.ts` — the server, one handler each, the
+  failures mapped to gRPC statuses by `@seats/errors`.
+- `src/clients.ts` — the two gRPC clients, each call with a deadline; a collaborator that does not answer is an InfrastructureError.
+- `src/store.ts` — the Booking DB: in memory, or MongoDB when configured (ADR-06).

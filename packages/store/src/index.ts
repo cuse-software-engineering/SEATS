@@ -10,6 +10,7 @@
 // insert() is atomic: the second insert of an id fails with DuplicateKeyError on both stores (the unique _id index in
 // MongoDB), which is how the Booking Service keeps first-lock-wins (BRULE-03, ADR-13).
 import type { Connection, Model } from 'mongoose';
+import { InfrastructureError } from '@seats/errors/src/index.js';
 
 export class DuplicateKeyError extends Error {
   constructor(public readonly collectionName: string, public readonly id: string) {
@@ -81,6 +82,10 @@ export function memoryStore(): Store {
 
 // ---------------------------------------------------------------- MongoDB through Mongoose
 const isDuplicateKey = (e: unknown): boolean => typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 11000;
+/** A failing driver call as the service reports it: the database did not answer (an InfrastructureError, retryable). */
+const database = async <T>(op: string, run: () => Promise<T>): Promise<T> => {
+  try { return await run(); } catch (e) { throw new InfrastructureError('MongoDB', `MongoDB did not answer ${op}: ${e instanceof Error ? e.message : String(e)}`, { cause: e }); }
+};
 /** A document as read from MongoDB: without its _id and as JSON (a BSON Date becomes its ISO string, as in memory). */
 const withoutId = <T>(d: Record<string, unknown>): T => { const { _id: _, ...rest } = d; return clone(rest as T); };
 const defined = (where: object): Record<string, unknown> => Object.fromEntries(Object.entries(where).filter(([, v]) => v !== undefined));
@@ -103,15 +108,15 @@ export async function mongoStore(url: string, dbName?: string): Promise<Store> {
     collection<T extends object>(name: string): Collection<T> {
       const M = modelFor(name);
       return {
-        get: async (id) => { const d = await M.findById(id).lean(); return d ? withoutId<T>(d as Record<string, unknown>) : null; },
-        put: async (id, doc) => { await M.replaceOne({ _id: id }, { _id: id, ...clone(doc) }, { upsert: true }); return doc; },
+        get: (id) => database(`${name}.get`, async () => { const d = await M.findById(id).lean(); return d ? withoutId<T>(d as Record<string, unknown>) : null; }),
+        put: (id, doc) => database(`${name}.put`, async () => { await M.replaceOne({ _id: id }, { _id: id, ...clone(doc) }, { upsert: true }); return doc; }),
         insert: async (id, doc) => {
-          try { await M.create({ _id: id, ...clone(doc) }); } catch (e) { if (isDuplicateKey(e)) throw new DuplicateKeyError(name, id); throw e; }
+          try { await M.create({ _id: id, ...clone(doc) }); } catch (e) { if (isDuplicateKey(e)) throw new DuplicateKeyError(name, id); throw new InfrastructureError('MongoDB', `MongoDB did not answer ${name}.insert: ${e instanceof Error ? e.message : String(e)}`, { cause: e }); }
           return doc;
         },
-        delete: async (id) => (await M.deleteOne({ _id: id })).deletedCount > 0,
-        list: async () => (await M.find().lean()).map((d) => withoutId<T>(d as Record<string, unknown>)),
-        find: async (where) => (await M.find(defined(where)).lean()).map((d) => withoutId<T>(d as Record<string, unknown>)),
+        delete: (id) => database(`${name}.delete`, async () => (await M.deleteOne({ _id: id })).deletedCount > 0),
+        list: () => database(`${name}.list`, async () => (await M.find().lean()).map((d) => withoutId<T>(d as Record<string, unknown>))),
+        find: (where) => database(`${name}.find`, async () => (await M.find(defined(where)).lean()).map((d) => withoutId<T>(d as Record<string, unknown>))),
       };
     },
     // empties the collections rather than dropping the database: a drop makes Mongoose re-initialise every model and buffer

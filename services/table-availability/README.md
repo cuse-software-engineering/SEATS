@@ -6,5 +6,6 @@ is won in the Booking DB. Its only API is gRPC :5003 (`proto/table_availability.
 apps (ADR-09) is `GetRoundTableStatus`, which the gateway serves as `GET /api/rounds/:id/table-status` with an ETag.
 
 - `src/domain.ts` — one function per operation of Table 5.3, plus `removeRoundTableStatus()` (the D of CRUD).
-- `src/store.ts` — in-memory store; replace by a Mongoose model, one document per round.
+- `src/repository.ts` — `RoundTableStatusRepository`, the domain's only access to the Table Status DB (one document per round).
+- `src/store.ts` — the Table Status DB, in memory or on MongoDB by configuration (ADR-06).
 - `src/grpc.ts`, `src/server.ts` — transport only, no rules.

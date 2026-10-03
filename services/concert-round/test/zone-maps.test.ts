@@ -6,7 +6,7 @@ import * as d from '../src/domain.js';
 import { tableAvailability } from '../src/clients.js';
 import { resetStore } from '../src/store.js';
 
-const refused = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const refused = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const ZONES = [{ id: 'A', name: 'Zone A' }, { id: 'B', name: 'Zone B' }];
 const TABLES = [
   { tableNumber: 1, zoneId: 'A', tableTypeId: 'sofa6', capacity: 6, x: 10, y: 10 },
@@ -19,10 +19,10 @@ beforeEach(async () => { await resetStore(); });
 
 describe('defineTableType', () => {
   test('validates id, name and capacity', async () => {
-    await refused(d.defineTableType('', { name: 'x', capacity: 2 }), 400);
-    await refused(d.defineTableType('t', { name: '', capacity: 2 }), 400);
-    await refused(d.defineTableType('t', { name: 'x', capacity: 0 }), 400);
-    await refused(d.defineTableType('t', { name: 'x', capacity: 1.5 }), 400);
+    await refused(d.defineTableType('', { name: 'x', capacity: 2 }), 'invalid');
+    await refused(d.defineTableType('t', { name: '', capacity: 2 }), 'invalid');
+    await refused(d.defineTableType('t', { name: 'x', capacity: 0 }), 'invalid');
+    await refused(d.defineTableType('t', { name: 'x', capacity: 1.5 }), 'invalid');
   });
   test('stores the type and lists it; a second definition replaces it', async () => {
     await d.defineTableType('sofa6', { name: '6-person sofa', capacity: 6, packageContent: 'one bottle' });
@@ -67,7 +67,7 @@ describe('createZoneMap and validateZoneMap', () => {
 describe('activateZoneMap', () => {
   test('refuses an invalid map with the problems as details', async () => {
     const m = await d.createZoneMap();
-    await assert.rejects(d.activateZoneMap(m.id), (e: unknown) => e instanceof d.DomainError && e.status === 400 && Array.isArray(e.details) && e.details.includes('the map has no zone'));
+    await assert.rejects(d.activateZoneMap(m.id), (e: unknown) => e instanceof d.DomainError && e.kind === 'invalid' && Array.isArray(e.details) && e.details.includes('the map has no zone'));
     assert.equal((await d.getZoneMap(m.id)).status, 'Draft');
   });
   test('activates a valid map and is idempotent', async () => {
@@ -86,12 +86,12 @@ describe('discardDraftZoneMap', () => {
     await defineTypes();
     const draft = await d.createZoneMap();
     assert.deepEqual(await d.discardDraftZoneMap(draft.id), { removed: true });
-    await refused(d.getZoneMap(draft.id), 404);
+    await refused(d.getZoneMap(draft.id), 'not_found');
     const m = await d.createZoneMap();
     await d.updateZoneMap(m.id, { zones: ZONES, tables: TABLES });
     await d.activateZoneMap(m.id);
-    await refused(d.discardDraftZoneMap(m.id), 409);
-    await refused(d.discardDraftZoneMap('nope'), 404);
+    await refused(d.discardDraftZoneMap(m.id), 'conflict');
+    await refused(d.discardDraftZoneMap('nope'), 'not_found');
   });
 });
 
@@ -106,8 +106,8 @@ describe('updateZoneMap on an Active map (UC-04 AF-1)', () => {
     tableAvailability.createRoundTableStatus = async (req) => ({ roundId: req.roundId ?? '', version: 1, tables: [] });
     tableAvailability.getRoundTableStatus = async (roundId) => ({ roundId, version: 2, tables: [{ tableNumber: 1, status: 'BOOKED', bookingId: 'b1', holdEndsAt: '' }, { tableNumber: 2, status: 'AVAILABLE', bookingId: '', holdEndsAt: '' }] });
     await d.publishRound(r.id);
-    await assert.rejects(d.updateZoneMap(m.id, { tables: TABLES.filter((t) => t.tableNumber !== 1) }), (e: unknown) => e instanceof d.DomainError && e.status === 409 && JSON.stringify(e.details) === '{"bookedTables":[1]}');
-    await assert.rejects(d.updateZoneMap(m.id, { tables: TABLES.map((t) => (t.tableNumber === 1 ? { ...t, x: 99 } : t)) }), (e: unknown) => e instanceof d.DomainError && e.status === 409);
+    await assert.rejects(d.updateZoneMap(m.id, { tables: TABLES.filter((t) => t.tableNumber !== 1) }), (e: unknown) => e instanceof d.DomainError && e.kind === 'conflict' && JSON.stringify(e.details) === '{"bookedTables":[1]}');
+    await assert.rejects(d.updateZoneMap(m.id, { tables: TABLES.map((t) => (t.tableNumber === 1 ? { ...t, x: 99 } : t)) }), (e: unknown) => e instanceof d.DomainError && e.kind === 'conflict');
     const view = await d.updateZoneMap(m.id, { name: 'Main hall v2', tables: TABLES.filter((t) => t.tableNumber !== 2) });
     assert.equal(view.name, 'Main hall v2');
     assert.equal(view.tables.length, 2);

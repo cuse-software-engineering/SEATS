@@ -127,8 +127,9 @@ TypeScript throughout (ES modules, `strict`), the same layout in every service:
 | File | Holds |
 |---|---|
 | `src/model.ts` | the types of the service's data model |
-| `src/domain.ts` | the rules: one function per operation of the document's Table 5.3; no transport code |
-| `src/store.ts` | the service's database as a repository (`@seats/store`, ADR-06): in memory by default, MongoDB through Mongoose when `<SERVICE>_MONGO_URL` or `MONGO_URL` is set |
+| `src/domain.ts` | the rules: one function per operation of the document's Table 5.3; no transport code. The two larger services keep them in a `src/domain/` folder, one file per use case, behind this barrel |
+| `src/repository.ts` | the service's repositories, one interface per aggregate with domain-named queries (`RoundRepository.publishedOnMap`, `BookingRepository.ofCustomer`, `TableLock.acquire`), implemented over `@seats/store` |
+| `src/store.ts` | the service's database (`@seats/store`, ADR-06): in memory by default, MongoDB through Mongoose when `<SERVICE>_MONGO_URL` or `MONGO_URL` is set |
 | `src/api.ts` | the API layer: one function per gRPC method, request message in, response message out |
 | `src/grpc.ts` | the gRPC server over the API layer, plus `grpc.health.v1.Health` |
 | `src/clients.ts` | the gRPC clients of the services it calls, each call with a deadline |
@@ -136,6 +137,15 @@ TypeScript throughout (ES modules, `strict`), the same layout in every service:
 | `test/` | unit tests of the domain with the clients stubbed |
 
 Every service serves the standard health check; the gateway's `GET /health` calls each of them.
+
+**Failures.** `packages/errors` tells three kinds apart, and its `toServiceError()` is the one place they become a gRPC
+status. A `DomainError` is a rule saying no, with a kind (`invalid`, `not_found`, `conflict`, `unauthenticated`,
+`not_implemented`) that the API layer maps to INVALID_ARGUMENT, NOT_FOUND, FAILED_PRECONDITION, UNAUTHENTICATED or
+UNIMPLEMENTED; the domain never sees an HTTP or gRPC code. An `InfrastructureError` is something the service depends on
+not answering, a collaborator service, the database or an external system behind an adapter: UNAVAILABLE, with the
+system named in `details`, retryable. Anything else thrown is a defect: logged with its stack under a reference id and
+answered INTERNAL with the reference only, so no stack or internal message reaches a client. The gateway maps the
+gRPC status to HTTP (400, 401, 404, 409, 501, 502, 504, 500).
 
 **Persistence (ADR-06).** `packages/store` holds the one repository contract, `Collection<T>` with `get`, `put`,
 `insert`, `delete`, `list` and `find`, all asynchronous, every read a copy, and two implementations: in memory, and

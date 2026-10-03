@@ -1,26 +1,15 @@
 // The API layer of the Concert Round Service: one function per method of concert_round.proto, from the request message
 // to the response message (ADR-14). grpc.ts wraps it as the gRPC server; the monolith mode calls it in-process. The
 // domain is asynchronous, so every handler answers a promise, which both callers await.
-import grpc from '@grpc/grpc-js';
 import type { ApiOf, CallContext } from '@seats/proto/api';
 import type { ConcertRoundHandlers } from '@seats/proto/gen/seats/concertround/v1/ConcertRound';
 import type { Round } from '@seats/proto/gen/seats/concertround/v1/Round';
 import type { Round as RoundRecord } from './model.js';
 import * as d from './domain.js';
 
-const CODES: Record<number, grpc.status> = { 400: grpc.status.INVALID_ARGUMENT, 404: grpc.status.NOT_FOUND, 409: grpc.status.FAILED_PRECONDITION, 501: grpc.status.UNIMPLEMENTED, 503: grpc.status.UNAVAILABLE };
-
-/** A DomainError as the gRPC status the caller sees; a failing collaborator is UNAVAILABLE. */
-export function toServiceError(e: unknown): grpc.ServiceError {
-  if (e instanceof d.DomainError) {
-    const metadata = new grpc.Metadata();
-    if (e.details !== undefined) metadata.set('error-details-bin', Buffer.from(JSON.stringify(e.details)));   // the gateway puts it in the JSON body
-    return Object.assign(new Error(e.message), { code: CODES[e.status] ?? grpc.status.INTERNAL, details: e.message, metadata });
-  }
-  const collaborator = typeof e === 'object' && e !== null && 'code' in e;   // the Table Availability Service refused or is down
-  const message = e instanceof Error ? e.message : String(e);
-  return Object.assign(new Error(message), { code: collaborator ? grpc.status.UNAVAILABLE : grpc.status.INTERNAL, details: message, metadata: new grpc.Metadata() });
-}
+/** The gRPC status a failure becomes (a DomainError by its kind, an InfrastructureError as UNAVAILABLE, anything else as
+ *  INTERNAL under a reference): the shared one of @seats/errors, re-exported here because grpc.ts and the monolith take it from the API layer. */
+export { toServiceError } from '@seats/errors/src/index.js';
 
 const defined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 
@@ -34,7 +23,7 @@ const toRound = async (r: RoundRecord & { confirmedBookings?: number }): Promise
 
 /** A Draft round is the Manager's: a Customer who asks for it by id gets NOT_FOUND (UC-03 AF-1). */
 const visible = <R extends { id: string; status: string }>(r: R, ctx: CallContext): R => {
-  if (ctx.role === 'customer' && r.status !== 'Published') throw new d.DomainError(404, `round ${r.id} not found`);
+  if (ctx.role === 'customer' && r.status !== 'Published') throw new d.DomainError('not_found', `round ${r.id} not found`);
   return r;
 };
 

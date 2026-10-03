@@ -1,0 +1,9 @@
+{
+  "name": "@seats/errors",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The three kinds of failure a service tells apart: a domain error (a rule said no), an infrastructure error (something the service depends on did not answer) and a defect (a bug), with the one mapping of each to a gRPC status that every service's API layer uses.",
+  "scripts": { "test": "node --import tsx --test 'test/*.test.ts'", "typecheck": "tsc -p . --noEmit", "build": "tsc -p . --noEmit" },
+  "dependencies": { "@grpc/grpc-js": "^1.12.0" }
+}

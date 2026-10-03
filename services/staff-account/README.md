@@ -11,5 +11,6 @@ signs everyone out. A wrong password or a Disabled account answers UNAUTHENTICAT
 still trusts the `x-user-id` / `x-role` headers: checking the bearer token on every staff route comes in progress 2.
 
 - `src/domain.ts` — `signIn()`, `signOut()`, `createStaffAccount()`, `listStaffAccounts()`, `updateStaffAccount()`, `disableStaffAccount()`, plus `seedStaffAccounts()`.
-- `src/store.ts` — in-memory store (swap for Mongoose, ADR-06).
+- `src/repository.ts` — `accounts` and `sessions`, the repositories the domain reads and writes through (one per aggregate).
+- `src/store.ts` — the Staff Account DB: in memory, or MongoDB by configuration (ADR-06).
 - `src/model.ts`, `src/grpc.ts`, `src/server.ts` — transport only.

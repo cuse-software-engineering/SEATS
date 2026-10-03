@@ -6,7 +6,7 @@ import { resetStore } from '../src/store.js';
 
 const ROUND = { roundId: 'r1', tables: [{ tableNumber: 1 }, { tableNumber: 2, forSale: true }, { tableNumber: 3, forSale: false }] };
 const ref = (tableNumber: number, bookingId = 'b1') => ({ roundId: 'r1', tableNumber, bookingId });
-const refused = (fn: () => Promise<unknown>, status: number) => assert.rejects(fn, (e: unknown) => e instanceof d.DomainError && e.status === status);
+const refused = (fn: () => Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(fn, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const statusOf = async (tableNumber: number) => (await d.getRoundTableStatus({ roundId: 'r1' })).tables.find((t) => t.tableNumber === tableNumber)?.status;
 
 beforeEach(async () => { await resetStore(); });
@@ -27,8 +27,8 @@ describe('createRoundTableStatus', () => {
     assert.equal(await statusOf(1), 'HELD');
   });
   test('refuses an empty request', async () => {
-    await refused(() => d.createRoundTableStatus({ roundId: '', tables: [{ tableNumber: 1 }] }), 400);
-    await refused(() => d.createRoundTableStatus({ roundId: 'r1', tables: [] }), 400);
+    await refused(() => d.createRoundTableStatus({ roundId: '', tables: [{ tableNumber: 1 }] }), 'invalid');
+    await refused(() => d.createRoundTableStatus({ roundId: 'r1', tables: [] }), 'invalid');
   });
 });
 
@@ -40,14 +40,14 @@ describe('holdTable', () => {
   });
   test('a second hold on the same table by another booking is refused', async () => {
     await d.holdTable(ref(1));
-    await refused(() => d.holdTable(ref(1, 'b2')), 409);
+    await refused(() => d.holdTable(ref(1, 'b2')), 'conflict');
     assert.equal((await d.getRoundTableStatus({ roundId: 'r1' })).tables[0].bookingId, 'b1');
   });
   test('needs a booking id, a known round and a known table; a table not for sale cannot be held', async () => {
-    await refused(() => d.holdTable({ roundId: 'r1', tableNumber: 1, bookingId: '' }), 400);
-    await refused(() => d.holdTable({ ...ref(1), roundId: 'nope' }), 404);
-    await refused(() => d.holdTable(ref(42)), 404);
-    await refused(() => d.holdTable(ref(3)), 409);
+    await refused(() => d.holdTable({ roundId: 'r1', tableNumber: 1, bookingId: '' }), 'invalid');
+    await refused(() => d.holdTable({ ...ref(1), roundId: 'nope' }), 'not_found');
+    await refused(() => d.holdTable(ref(42)), 'not_found');
+    await refused(() => d.holdTable(ref(3)), 'conflict');
   });
 });
 
@@ -65,7 +65,7 @@ describe('releaseHold', () => {
   });
   test('is refused with another booking id', async () => {
     await d.holdTable(ref(1));
-    await refused(() => d.releaseHold(ref(1, 'b2')), 409);
+    await refused(() => d.releaseHold(ref(1, 'b2')), 'conflict');
     assert.equal(await statusOf(1), 'HELD');
   });
 });
@@ -81,14 +81,14 @@ describe('markTableBooked and markTableOccupied', () => {
     assert.equal((await d.markTableOccupied(ref(1))).status, 'OCCUPIED');
   });
   test('wrong-state transitions are refused', async () => {
-    await refused(() => d.markTableBooked(ref(1)), 409);        // AVAILABLE, not HELD
-    await refused(() => d.markTableOccupied(ref(1)), 409);      // AVAILABLE, not BOOKED
+    await refused(() => d.markTableBooked(ref(1)), 'conflict');        // AVAILABLE, not HELD
+    await refused(() => d.markTableOccupied(ref(1)), 'conflict');      // AVAILABLE, not BOOKED
     await d.holdTable(ref(1));
-    await refused(() => d.markTableOccupied(ref(1)), 409);      // HELD, not BOOKED
-    await refused(() => d.markTableBooked(ref(1, 'b2')), 409);  // another booking
+    await refused(() => d.markTableOccupied(ref(1)), 'conflict');      // HELD, not BOOKED
+    await refused(() => d.markTableBooked(ref(1, 'b2')), 'conflict');  // another booking
     await d.markTableBooked(ref(1));
-    await refused(() => d.releaseHold(ref(1)), 409);            // BOOKED is not released
-    await refused(() => d.holdTable(ref(1, 'b2')), 409);
+    await refused(() => d.releaseHold(ref(1)), 'conflict');            // BOOKED is not released
+    await refused(() => d.holdTable(ref(1, 'b2')), 'conflict');
   });
 });
 
@@ -107,13 +107,13 @@ describe('removeRoundTableStatus', () => {
   beforeEach(async () => { await d.createRoundTableStatus(ROUND); });
   test('is refused while a table is held or booked', async () => {
     await d.holdTable(ref(1));
-    await refused(() => d.removeRoundTableStatus({ roundId: 'r1' }), 409);
+    await refused(() => d.removeRoundTableStatus({ roundId: 'r1' }), 'conflict');
     await d.markTableBooked(ref(1));
-    await refused(() => d.removeRoundTableStatus({ roundId: 'r1' }), 409);
+    await refused(() => d.removeRoundTableStatus({ roundId: 'r1' }), 'conflict');
   });
   test('removes the document otherwise; an unknown round is not removed', async () => {
     assert.deepEqual(await d.removeRoundTableStatus({ roundId: 'r1' }), { removed: true });
-    await refused(() => d.getRoundTableStatus({ roundId: 'r1' }), 404);
+    await refused(() => d.getRoundTableStatus({ roundId: 'r1' }), 'not_found');
     assert.deepEqual(await d.removeRoundTableStatus({ roundId: 'r1' }), { removed: false });
   });
 });

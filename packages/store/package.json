@@ -4,6 +4,13 @@
   "private": true,
   "type": "module",
   "description": "The repository of a service's database (ADR-06, one database per service): one Collection<T> contract with an in-memory implementation for development and tests and a MongoDB implementation through Mongoose, chosen per service by configuration.",
-  "scripts": { "test": "node --import tsx --test 'test/*.test.ts'", "typecheck": "tsc -p . --noEmit", "build": "tsc -p . --noEmit" },
-  "dependencies": { "mongoose": "^8.9.0" }
+  "scripts": {
+    "test": "node --import tsx --test 'test/*.test.ts'",
+    "typecheck": "tsc -p . --noEmit",
+    "build": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@seats/errors": "*",
+    "mongoose": "^8.9.0"
+  }
 }

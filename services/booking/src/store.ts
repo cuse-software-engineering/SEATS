@@ -1,13 +1,13 @@
-// The Booking DB of this service (ADR-06: one database per service). The domain talks to Collection<T> of @seats/store;
-// the implementation is chosen when the service starts: BOOKING_MONGO_URL, or MONGO_URL with the database
-// seats_booking, selects MongoDB through Mongoose; otherwise the database is in memory (development, the tests, the
-// free-plan demo deployment).
+// The Booking DB of this service (ADR-06: one database per service). repository.ts talks to Collection<T> of
+// @seats/store and the domain to the repositories; the implementation is chosen when the service starts:
+// BOOKING_MONGO_URL, or MONGO_URL with the database seats_booking, selects MongoDB through Mongoose; otherwise the
+// database is in memory (development, the tests, the free-plan demo deployment).
 import { serviceStore } from '@seats/store/src/index.js';
 export type { Collection } from '@seats/store/src/index.js';
 export { DuplicateKeyError } from '@seats/store/src/index.js';
 
 export const store = serviceStore('booking');
-/** A collection handle of this service's database; domain.ts takes its handles at module load. */
+/** A collection handle of this service's database; repository.ts takes its handles at module load, nobody else. */
 export const collection = store.collection;
 /** Chooses the implementation from the configuration; server.ts and the monolith call it before serving. */
 export const connectStore = store.connect;

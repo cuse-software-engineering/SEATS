@@ -1,8 +1,10 @@
-// gRPC client of the Table Availability Service (ADR-12). Every call carries a deadline.
+// gRPC client of the Table Availability Service (ADR-12). Every call carries a deadline; a collaborator that does not
+// answer (down, slow, broken) is an InfrastructureError naming it, while its own refusals pass through for the domain.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import grpc from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
+import { fromCollaborator } from '@seats/errors/src/index.js';
 import type { ProtoGrpcType } from '@seats/proto/gen/table_availability';
 import type { CreateRoundTableStatusRequest } from '@seats/proto/gen/seats/tableavailability/v1/CreateRoundTableStatusRequest';
 import type { RoundTableStatus__Output } from '@seats/proto/gen/seats/tableavailability/v1/RoundTableStatus';
@@ -16,7 +18,7 @@ const client = new pkg.seats.tableavailability.v1.TableAvailability(process.env.
 const DEADLINE_MS = 2000;
 const opts = (): grpc.CallOptions => ({ deadline: Date.now() + DEADLINE_MS });
 const promisify = <Res>(run: (cb: grpc.requestCallback<Res>) => void) =>
-  new Promise<Res>((resolve, reject) => run((err, res) => (err ? reject(err) : resolve(res as Res))));
+  new Promise<Res>((resolve, reject) => run((err, res) => (err ? reject(fromCollaborator('the Table Availability Service', err)) : resolve(res as Res))));
 
 export const tableAvailability = {
   createRoundTableStatus: (req: CreateRoundTableStatusRequest) => promisify<RoundTableStatus__Output>((cb) => client.createRoundTableStatus(req, opts(), cb)),

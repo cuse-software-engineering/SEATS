@@ -143,7 +143,7 @@ test('UC-04 EF-3 Zone Map Image Cannot Be Uploaded', inProcessOnly('the fake med
   (mediaAdapters.mediaStorage as FakeMediaStorage).failNext = 1;                       // the object storage refuses the next image
   const failed = await call(manager, 'POST', `/api/zone-maps/${id}/image`, { fileName: 'garden.png' });
   assert.equal(failed.status, 502); assert.match(failed.json.error, /could not be stored; the zone map is unchanged/);
-  assert.equal(failed.json.details.external, 'Media Storage');
+  assert.equal(failed.json.details.system, 'the object storage');   // an InfrastructureError names the system that failed
   assert.equal((await call(manager, 'GET', `/api/zone-maps/${id}`)).json.imageUrl, '', 'step 3 is repeated later; the map keeps its state');
   const ok = await call(manager, 'POST', `/api/zone-maps/${id}/image`, { fileName: 'garden.png' });
   assert.equal(ok.status, 200); assert.match(ok.json.imageUrl, /garden\.png$/);

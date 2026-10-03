@@ -18,7 +18,7 @@ test('the image goes through the adapter and its URL is kept on the map', async 
 test('UC-04 EF-3: when the storage refuses the image the map is unchanged and the Manager learns why', async () => {
   const map = await d.createZoneMap({ name: 'Main hall' });
   storage.failNext = 1;
-  await assert.rejects(d.uploadZoneMapImage(map.id, { fileName: 'hall.png' }), (e: unknown) => e instanceof d.DomainError && e.status === 503 && /unchanged/.test(e.message));
+  await assert.rejects(d.uploadZoneMapImage(map.id, { fileName: 'hall.png' }), (e: unknown) => e instanceof d.InfrastructureError && e.system === 'the object storage' && /unchanged/.test(e.message));
   assert.equal((await d.getZoneMap(map.id)).imageUrl, '');
   const again = await d.uploadZoneMapImage(map.id, { fileName: 'hall.png' });   // the storage is back
   assert.equal(again.imageUrl, `https://storage.example/zone-maps/${map.id}/hall.png`);
@@ -26,6 +26,6 @@ test('UC-04 EF-3: when the storage refuses the image the map is unchanged and th
 
 test('a missing file name is refused before the adapter is asked', async () => {
   const map = await d.createZoneMap({ name: 'Main hall' });
-  await assert.rejects(d.uploadZoneMapImage(map.id, {}), (e: unknown) => e instanceof d.DomainError && e.status === 400);
+  await assert.rejects(d.uploadZoneMapImage(map.id, {}), (e: unknown) => e instanceof d.DomainError && e.kind === 'invalid');
   assert.equal(storage.stored.length, 0);
 });

@@ -5,14 +5,28 @@ The venue and events context: zone maps, table types, concert rounds, package pr
 routes onto it (`docs/contracts.md`), and the Booking Service calls its three reads. Calls the Table Availability
 Service by gRPC when a round is published and for the sold-out status and booked tables.
 
-- `src/domain.ts` — one function per operation of Table 5.3, plus `discardDraftZoneMap()` and `discardDraftRound()`.
-  Every operation is asynchronous: it awaits the Round DB and answers a promise.
+- `src/domain/` — one function per operation of Table 5.3, plus `discardDraftZoneMap()` and `discardDraftRound()`,
+  one file per use case: `business-parameters.ts` (UC-07), `table-types.ts` (FR-37), `zone-maps.ts` (UC-04),
+  `rounds.ts` (UC-03, publishing included), `shared.ts` (the helpers they share, not exported) and `index.ts`, the
+  barrel; `src/domain.ts` re-exports that barrel so every caller keeps importing `./domain.js`. Every operation is
+  asynchronous: it awaits the Round DB and answers a promise.
+- `src/repository.ts` — one repository per aggregate (`zoneMaps`, `tableTypes`, `rounds`) and one for the single
+  `businessParameters` document, each an interface in the words of the domain (`get`, `save`, `remove`, `all`,
+  `withStatus`, `published`, `publishedOnMap`) implemented once over `collection<T>()` of `store.ts`; the domain
+  imports these objects and never a collection.
 - `src/store.ts` — the Round DB (ADR-06): binds this service to the shared repository package `@seats/store`
-  (`packages/store`). The domain takes `collection<T>(name)` handles at module load and talks to the
+  (`packages/store`). `repository.ts` takes `collection<T>(name)` handles at module load and talks to the
   `get`/`put`/`insert`/`delete`/`list`/`find` contract only; which implementation answers (MongoDB or memory) is
-  chosen once, by `connectStore()` at start-up, so `domain.ts` and every test are the same against both. Reads answer
-  copies, so an operation that changes a document `put()`s it back.
+  chosen once, by `connectStore()` at start-up, so the domain and every test are the same against both. Reads answer
+  copies, so an operation that changes a document `save()`s it back.
 - `src/model.ts`, `src/grpc.ts`, `src/clients.ts`, `src/server.ts` — transport only.
+
+Failures are the classes of `@seats/errors` (`packages/errors`): a rule that says no is a `DomainError` whose `kind`
+(`invalid`, `not_found`, `conflict`, `not_implemented`) the shared `toServiceError()` maps to the gRPC status and the
+gateway to HTTP 400/404/409/501; a dependency that does not answer (the object storage behind the Media Storage
+Adapter, the Table Availability Service, MongoDB) is an `InfrastructureError` naming the `system`, answered as
+UNAVAILABLE (HTTP 502); anything else is a defect, logged under a reference and answered as INTERNAL. The domain knows
+the kinds only, never a status code.
 
 The "REST service with CRUD" of Deliverable 3 is the gateway's REST API over this service: zone maps and rounds are
 created, read, updated and deleted with curl through `:4000`, and the gateway log shows the gRPC call behind each.

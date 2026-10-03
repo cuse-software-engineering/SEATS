@@ -2,6 +2,8 @@
 // gRPC call to the owning service: path, query and JSON body in, JSON out, gRPC status mapped to an HTTP status.
 // A route with auth 'none' (sign-in, the payment webhook) skips the headers and the role check. createApp() builds the
 // app without listening: server.ts listens, and so do the monolith (ADR-14) and the in-process tests.
+import { isGrpcServiceError } from '@seats/errors/src/index.js';
+import { randomUUID } from 'node:crypto';
 import express, { type Request, type Response } from 'express';
 import grpc from '@grpc/grpc-js';
 import { DEADLINE_MS, healthOf } from './clients.js';
@@ -56,7 +58,14 @@ const handle = (route: Route) => async (req: Request, res: Response) => {
     log(req, route, 200, started, role, userId);
     res.json(route.pick ? route.pick(out) : out);
   } catch (e) {
-    const err = e as grpc.ServiceError;
+    if (!isGrpcServiceError(e)) {                                   // a defect in the gateway itself: logged with its stack, answered with a reference only
+      const ref = randomUUID().slice(0, 8);
+      console.error(`[gateway] [defect ${ref}]`, e instanceof Error ? e.stack ?? e.message : e);
+      log(req, route, 500, started, role, userId);
+      res.status(500).json({ error: `internal error (ref ${ref})` });
+      return;
+    }
+    const err = e;
     const status = HTTP_STATUS[err.code] ?? 500;
     const raw = err.metadata?.get('error-details-bin')[0];
     const details = raw ? JSON.parse(raw.toString()) : undefined;
