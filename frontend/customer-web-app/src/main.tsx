@@ -10,6 +10,7 @@ import C6BookingTerms from './screens/C6BookingTerms';
 import C7Payment from './screens/C7Payment';
 import C8ConfirmationAndETicket from './screens/C8ConfirmationAndETicket';
 import C9MyBookings from './screens/C9MyBookings';
+import { Screen } from './Screen';
 import './styles.css';
 
 // One route per screen of Table D.1 (Appendix D).
@@ -27,7 +28,7 @@ const router = createBrowserRouter([
       { path: 'bookings/:id/payment', element: <C7Payment /> },
       { path: 'bookings/:id/confirmation', element: <C8ConfirmationAndETicket /> },
       { path: 'my-bookings', element: <C9MyBookings /> },
-      { path: '*', element: <p className="muted">No such screen.</p> },
+      { path: '*', element: <Screen title="Not found" back="/"><p className="muted">No such screen.</p></Screen> },
     ],
   },
 ], { future: { v7_relativeSplatPath: true } });

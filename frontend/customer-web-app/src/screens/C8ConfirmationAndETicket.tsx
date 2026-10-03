@@ -1,10 +1,16 @@
 import { Link, useParams } from 'react-router-dom';
-import { api, type ApiError, Badge, type Booking, type ETicket, ErrorAlert, fmtDate, fmtDateTime, fmtTHB, type Round, toApiError, useLoad } from '@seats/frontend-shared';
+import { api, type ApiError, type Booking, type ETicket, ErrorAlert, tableLabel, toApiError, useLoad } from '@seats/frontend-shared';
+import { Screen } from '../Screen';
+import { extraPersons, fmtClock, roundTitle, thb, typeLabel, zoneLabel } from '../format';
+import { useRoundOf } from '../hooks';
 
 type Ticket = { ticket: ETicket } | { notBuilt: ApiError };
 
-/** C8 Confirmation and e-ticket (UC-01 steps 16–20, EF-3): the Confirmed banner, the QR e-ticket with the booking
- *  reference, the booking details, the check-in window (from the round), the note about the LINE copy. */
+/** "SEATS-260926-A12-····": the shape of a booking reference while the e-ticket route is a stub (progress 1). */
+const placeholderReference = (date: string | undefined, label: string): string => `SEATS-${(date ?? '').replace(/-/g, '').slice(2, 8) || '······'}-${label || '··'}-····`;
+
+/** C8 Confirmation and e-ticket (UC-01 steps 16–20, EF-3): the result box, the e-ticket card with the QR, the
+ *  booking reference and the booking details, the note about the LINE copy, My bookings. */
 export default function C8ConfirmationAndETicket() {
   const { id = '' } = useParams();
   const booking = useLoad(() => api.get<Booking>(`/api/bookings/${id}`), [id]);
@@ -12,44 +18,51 @@ export default function C8ConfirmationAndETicket() {
     try { return { ticket: await api.get<ETicket>(`/api/bookings/${id}/e-ticket`) }; }
     catch (e) { const err = toApiError(e); if (err.status === 501) return { notBuilt: err }; throw e; }
   }, [id]);
-  const roundId = booking.data?.roundId;
-  const round = useLoad(() => (roundId ? api.get<Round>(`/api/rounds/${roundId}`) : Promise.resolve(null)), [roundId]);
+  const { round, table } = useRoundOf(booking.data);
   const b = booking.data;
-  const w = round.data?.checkInWindow;
+  const r = round.data;
+  const w = r?.checkInWindow;
+  const confirmed = b?.status === 'Confirmed' || b?.status === 'Checked-in';
+  const label = tableLabel(b?.zoneId, b?.tableNumber);
+  const extra = b?.fee?.extraPersons ?? 0;
 
   return (
-    <>
-      {b?.status === 'Confirmed' ? <div className="banner">Booking confirmed</div> : b && <div className="banner">Booking {b.status} <span className="small muted">— the confirmation comes with the payment in progress 2</span></div>}
+    <Screen title="Confirmation" padTop={8}>
       <ErrorAlert error={booking.error} />
       <ErrorAlert error={ticket.error} />
       <ErrorAlert error={round.error} />
-      <div className="card">
-        <h4>E-ticket</h4>
-        {ticket.data && 'ticket' in ticket.data && (
-          <div className="row">
-            <div className="qr">{ticket.data.ticket.qrPayload}</div>
-            <div>Booking reference <strong>{ticket.data.ticket.bookingReference}</strong><br /><span className="small muted">Show this QR at the door; a copy was sent to your LINE chat.</span></div>
-          </div>
-        )}
-        {ticket.data && 'notBuilt' in ticket.data && <div className="notice">The e-ticket comes in progress 2. The gateway answered {ticket.data.notBuilt.status}: {ticket.data.notBuilt.error}</div>}
-      </div>
       {b && (
-        <div className="card">
-          <h4>Booking details</h4>
-          <table className="data">
-            <tbody>
-              <tr><th>Booking</th><td><code>{b.id}</code> <Badge>{b.status}</Badge></td></tr>
-              <tr><th>Round</th><td>{round.data ? `${round.data.name ?? ''} · ${round.data.artist ?? ''} · ${fmtDate(round.data.date)} · start ${fmtDateTime(round.data.startAt)}` : b.roundId}</td></tr>
-              <tr><th>Table</th><td>#{b.tableNumber} · {b.zoneName ?? b.zoneId} · {b.capacity} seats</td></tr>
-              <tr><th>Party size</th><td>{b.partySize ?? '–'}</td></tr>
-              <tr><th>Full table fee</th><td>{fmtTHB(b.fee?.fullTableFee)}</td></tr>
-              {w && <tr><th>Check-in window</th><td>{fmtDateTime(w.opensAt)} until {fmtDateTime(w.graceEndsAt)} (start {fmtDateTime(w.startAt)})</td></tr>}
-            </tbody>
-          </table>
-          <p className="small muted">A copy of this confirmation is sent to your LINE chat (Notification Service).</p>
-          <div className="row"><Link className="btn secondary" to="/my-bookings">My Bookings</Link></div>
+        <div className="result" data-testid="result">
+          {confirmed ? (
+            <><div className="big">✓ Booking confirmed</div><div className="muted">Paid in full · {thb(b.fee?.fullTableFee)}</div></>
+          ) : (
+            <><div className="big">Booking {b.status?.toLowerCase() ?? ''}</div><div className="muted">Not paid yet · the confirmation comes with the payment in progress 2</div></>
+          )}
         </div>
       )}
-    </>
+      <div className="card center">
+        <div className="tiny">E-TICKET</div>
+        <div className="qr" role="img" aria-label="e-ticket QR" />
+        <div className="mono" style={{ fontSize: 13 }} data-testid="booking-reference">
+          {ticket.data && 'ticket' in ticket.data ? ticket.data.ticket.bookingReference : placeholderReference(r?.date, label)}
+        </div>
+        {ticket.data && 'notBuilt' in ticket.data && (
+          <div className="notice" style={{ textAlign: 'left' }} data-testid="eticket-notice">
+            <strong>The e-ticket comes with progress 2.</strong> The gateway answered {ticket.data.notBuilt.status}: {ticket.data.notBuilt.error}.
+          </div>
+        )}
+        <div className="hr" />
+        {b && (
+          <div className="kv">
+            <span className="k">Round</span><span>{roundTitle(r)}</span>
+            <span className="k">Table</span><span>{label} · {zoneLabel(b.zoneId, b.zoneName)} · {typeLabel(table ?? b)}</span>
+            <span className="k">Party size</span><span>{b.partySize ?? '–'}{extra > 0 ? ` (${extraPersons(extra)} paid)` : ''}</span>
+            <span className="k">Check-in</span><span>{w ? `from ${fmtClock(w.opensAt)} · table kept until ${fmtClock(w.graceEndsAt)}` : '–'}</span>
+          </div>
+        )}
+      </div>
+      <div className="tiny">A copy with the booking terms was sent to your LINE chat.</div>
+      <Link className="btn secondary small" to="/my-bookings">My bookings</Link>
+    </Screen>
   );
 }

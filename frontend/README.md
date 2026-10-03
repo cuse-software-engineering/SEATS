@@ -56,8 +56,21 @@ starts proxies `/api` to that same gateway.
 **Naming rule**: one file per use case (`tests/uc-NN.spec.ts`) and every test is named exactly
 `<UC id> <flow id> <flow title>` as the document names the flow, for example `UC-01 AF-3 Table Just Taken by Another
 Customer` or `UC-03 basic flow Create Concert Round`; the backend traceability script matches on that prefix. The
-screens carry a few `data-testid` attributes (`counts`, `countdown`, `fee-total`, `validation`, `map-head`,
-`round-head`, …) where a heading or a button name is not a stable selector.
+screens carry a few `data-testid` attributes (`round`, `booking`, `countdown`, `fee-total`, `price-lines`, `toast`,
+`validation`, `table-properties`, `zone-summary`, …) where a heading or a button name is not a stable selector; every
+table shape has the accessible name `table N, <status>`.
+
+## Look and layout
+
+Both apps follow the wireframes of Appendix D screen for screen: the customer app is the LIFF page, a phone-width
+column with the 48px app bar (back chevron, title, the hold countdown at the right, and a ⋮ menu with Concert rounds,
+My bookings and Log out, which stand in for LINE's rich menu); the back-office has the dark top bar, the left sidebar
+(a drawer behind ☰ on a phone, where the front staff use B5 and B6) and the three-column editors. The table map is
+the shared `TableGrid` of `frontend/shared/src/ui.tsx`: a shape per table (circle, square, sofa, seat, from the
+table type), labelled with the zone letter and the number (`A12`), filled by status as the wireframes draw it, with a
+tint on top (available green, held amber hatch, booked slate, occupied dark). One accent colour marks the primary
+actions, the links and the current sidebar item. The wireframe sources (`tools/draw_screens.py` of the group folder)
+carry the same ⋮ and ☰, so the figures and the screens agree.
 
 ## Fake authentication (progress 1)
 

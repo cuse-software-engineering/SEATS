@@ -1,96 +1,138 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { api, Badge, type BusinessParameters, ErrorAlert, type StaffAccount, type StaffRole, useAction, useLoad } from '@seats/frontend-shared';
+import { useLocation } from 'react-router-dom';
+import { api, type BusinessParameters, ErrorAlert, fmtDateTime, type StaffAccount, type StaffRole, useAction, useLoad, useSession } from '@seats/frontend-shared';
+import { ROLE_NAME } from '../parts';
 
 const ROLES: StaffRole[] = ['manager', 'front_staff', 'owner'];
-const FIELDS: { key: keyof BusinessParameters; label: string }[] = [
-  { key: 'holdPeriodMinutes', label: 'Hold period, minutes (BRULE-02)' },
-  { key: 'checkInWindowHours', label: 'Check-in window, hours (BRULE-04)' },
-  { key: 'gracePeriodMinutes', label: 'Grace period, minutes (BRULE-05)' },
-  { key: 'extraPersonFee', label: 'Extra-person fee, THB (BRULE-09)' },
+const FIELDS: { key: keyof BusinessParameters; label: string; unit: string }[] = [
+  { key: 'holdPeriodMinutes', label: 'Hold period', unit: 'min' },
+  { key: 'checkInWindowHours', label: 'Check-in window', unit: 'h before the start' },
+  { key: 'gracePeriodMinutes', label: 'Grace period', unit: 'min after the start' },
+  { key: 'extraPersonFee', label: 'Extra-person fee', unit: 'THB per person' },
 ];
+type ParamForm = Record<keyof BusinessParameters, string>;
+const EMPTY: ParamForm = { holdPeriodMinutes: '', checkInWindowHours: '', gracePeriodMinutes: '', extraPersonFee: '' };
 
-/** B7 Business parameters and staff accounts (UC-07; UC-08): the four parameters; the staff accounts with role,
- *  create, change the role or the password, disable. */
+/** B7 Business parameters and staff accounts (UC-07; UC-08; Table D.16), the two cards of the wireframe side by
+ *  side: the four parameters with Save; the staff accounts with Create account, a row selected by a click, Change
+ *  role (and a new password) and Disable. The sidebar's "Business parameters" and "Staff accounts" both open this
+ *  screen; the hash scrolls to the card. */
 export default function B7BusinessParametersAndStaffAccounts() {
+  const session = useSession();
+  const hash = useLocation().hash;
   const params = useLoad(() => api.get<BusinessParameters>('/api/business-parameters'), []);
   const accounts = useLoad(() => api.get<StaffAccount[]>('/api/staff-accounts'), []);
   const action = useAction();
-  const [form, setForm] = useState<Record<keyof BusinessParameters, string>>({ holdPeriodMinutes: '', checkInWindowHours: '', gracePeriodMinutes: '', extraPersonFee: '' });
+  const [form, setForm] = useState<ParamForm>(EMPTY);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [create, setCreate] = useState<{ username: string; role: StaffRole; password: string }>({ username: '', role: 'front_staff', password: '' });
-  const [edits, setEdits] = useState<Record<string, { role?: StaffRole; password?: string }>>({});
+  const [sel, setSel] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
+  const [edit, setEdit] = useState<{ role: StaffRole; password: string }>({ role: 'front_staff', password: '' });
   useEffect(() => {
     if (params.data) setForm({ holdPeriodMinutes: String(params.data.holdPeriodMinutes ?? ''), checkInWindowHours: String(params.data.checkInWindowHours ?? ''), gracePeriodMinutes: String(params.data.gracePeriodMinutes ?? ''), extraPersonFee: String(params.data.extraPersonFee ?? '') });
   }, [params.data]);
+  useEffect(() => {
+    const id = hash.replace(/^#/, '');
+    if (id) document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  }, [hash]);
 
   const saveParams = async (e: FormEvent) => {
     e.preventDefault();
     const body: BusinessParameters = {};
     for (const f of FIELDS) if (form[f.key] !== '') body[f.key] = Number(form[f.key]);
     const saved = await action.run(() => api.put<BusinessParameters>('/api/business-parameters', body));
-    if (saved) params.setData(saved);
+    if (saved) { params.setData(saved); setSavedAt(new Date().toISOString()); }
   };
   const createAccount = async (e: FormEvent) => {
     e.preventDefault();
     const r = await action.run(() => api.post<StaffAccount>('/api/staff-accounts', create));
-    if (r) { setCreate({ username: '', role: 'front_staff', password: '' }); accounts.reload(); }
+    if (r) { setCreate({ username: '', role: 'front_staff', password: '' }); setCreating(false); accounts.reload(); }
   };
-  const update = async (id: string) => {
-    const edit = edits[id] ?? {};
-    const r = await action.run(() => api.put<StaffAccount>(`/api/staff-accounts/${id}`, { role: edit.role, password: edit.password || undefined }));
-    if (r) { setEdits((e) => ({ ...e, [id]: {} })); accounts.reload(); }
+  const select = (a: StaffAccount) => {
+    setSel(a.staffAccountId ?? null);
+    setChanging(false);
+    setEdit({ role: a.role ?? 'front_staff', password: '' });
   };
-  const disable = async (id: string) => {
+  const saveRole = async (e: FormEvent) => {
+    e.preventDefault();
+    const r = await action.run(() => api.put<StaffAccount>(`/api/staff-accounts/${sel}`, { role: edit.role, password: edit.password || undefined }));
+    if (r) { setChanging(false); setEdit({ ...edit, password: '' }); accounts.reload(); }
+  };
+  const disable = async () => {
     if (!window.confirm('Disable this account? It can no longer sign in.')) return;
-    const r = await action.run(() => api.delete<StaffAccount>(`/api/staff-accounts/${id}`));
+    const r = await action.run(() => api.delete<StaffAccount>(`/api/staff-accounts/${sel}`));
     if (r) accounts.reload();
   };
+  const cur = accounts.data?.find((a) => a.staffAccountId === sel);
 
   return (
     <>
-      <h1>Settings</h1>
-      <ErrorAlert error={params.error} />
       <ErrorAlert error={action.error} onClose={action.clear} />
-      <form className="card" onSubmit={saveParams} style={{ maxWidth: 520 }}>
-        <h4>Business parameters (UC-07)</h4>
-        {FIELDS.map((f) => (
-          <label key={f.key} className="field">{f.label}<input type="number" min={0} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} /></label>
-        ))}
-        <button type="submit" disabled={action.busy || !params.data}>Save parameters</button>
-        <p className="small muted">A Published round keeps the values snapshotted at its publish (FR-38).</p>
-      </form>
+      <div className="cols">
+        <form className="panel" id="business-parameters" onSubmit={saveParams} style={{ width: 380, flex: 'none', maxWidth: '100%' }} data-testid="business-parameters">
+          <div className="pt">Business parameters</div>
+          <ErrorAlert error={params.error} />
+          {FIELDS.map((f) => (
+            <div key={f.key} className="frow">
+              <label className="fl" htmlFor={`bp-${f.key}`}>{f.label}</label>
+              <input id={`bp-${f.key}`} type="number" min={0} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} disabled={!params.data} />
+              <span className="unit">{f.unit}</span>
+            </div>
+          ))}
+          <div className="btnrow">
+            <button type="submit" className="primary" disabled={action.busy || !params.data}>Save</button>
+            {savedAt && <span className="tiny">Last saved {fmtDateTime(savedAt)} by {session?.label ?? session?.userId}</span>}
+          </div>
+          <div className="tiny" style={{ marginTop: 8 }}>
+            The hold period bounds every new hold; the check-in window and the grace period are derived for each round from these values; the extra-person fee is charged per person above the capacity of the table type. A Published round keeps the values snapshotted at its publish (FR-38).
+          </div>
+        </form>
 
-      <div className="card">
-        <h4>Staff accounts (UC-08)</h4>
-        <ErrorAlert error={accounts.error} />
-        {accounts.data && (
-          <table className="data">
-            <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>New password</th><th></th></tr></thead>
+        <div className="panel grow" id="staff-accounts" data-testid="staff-accounts">
+          <div className="row" style={{ marginBottom: 6 }}>
+            <span className="pt" style={{ margin: 0 }}>Staff accounts</span>
+            <button type="button" className="small" onClick={() => setCreating(!creating)} aria-expanded={creating}>+ Create account</button>
+          </div>
+          <ErrorAlert error={accounts.error} />
+          {creating && (
+            <form className="frow" onSubmit={createAccount} style={{ marginBottom: 8, flexWrap: 'wrap' }}>
+              <input value={create.username} onChange={(e) => setCreate({ ...create, username: e.target.value })} placeholder="username" aria-label="username" autoComplete="off" style={{ flex: '1 1 110px' }} />
+              <select value={create.role} onChange={(e) => setCreate({ ...create, role: e.target.value as StaffRole })} aria-label="role" style={{ flex: '0 1 120px' }}>{ROLES.map((r) => <option key={r} value={r}>{ROLE_NAME[r]}</option>)}</select>
+              <input type="password" value={create.password} onChange={(e) => setCreate({ ...create, password: e.target.value })} placeholder="password" aria-label="password" autoComplete="new-password" style={{ flex: '1 1 110px' }} />
+              <button type="submit" className="small primary" disabled={action.busy || !create.username.trim() || !create.password}>Create</button>
+            </form>
+          )}
+          <table className="tbl clickable">
+            <thead><tr><th style={{ width: 90 }}>Username</th><th>Role</th><th style={{ width: 72 }}>Status</th><th style={{ width: 96 }}>Last sign-in</th></tr></thead>
             <tbody>
-              {accounts.data.map((a) => {
-                const id = a.staffAccountId ?? '';
-                const edit = edits[id] ?? {};
-                return (
-                  <tr key={id}>
-                    <td><strong>{a.username}</strong><div className="small muted"><code>{id}</code></div></td>
-                    <td><select value={edit.role ?? a.role ?? ''} onChange={(e) => setEdits({ ...edits, [id]: { ...edit, role: e.target.value as StaffRole } })} disabled={a.status === 'Disabled'}>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
-                    <td><Badge solid={a.status === 'Active'}>{a.status}</Badge></td>
-                    <td><input type="password" value={edit.password ?? ''} onChange={(e) => setEdits({ ...edits, [id]: { ...edit, password: e.target.value } })} placeholder="leave empty to keep" disabled={a.status === 'Disabled'} /></td>
-                    <td className="tight">
-                      <button type="button" className="secondary" onClick={() => update(id)} disabled={action.busy || a.status === 'Disabled' || (!edit.role && !edit.password)}>Save</button>{' '}
-                      <button type="button" className="link" onClick={() => disable(id)} disabled={action.busy || a.status === 'Disabled'}>disable</button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {accounts.data?.map((a) => (
+                <tr key={a.staffAccountId} className={a.staffAccountId === sel ? 'sel' : ''} onClick={() => select(a)} aria-selected={a.staffAccountId === sel}>
+                  <td>{a.username}</td>
+                  <td>{a.role ? ROLE_NAME[a.role] : '–'}</td>
+                  <td>{a.status}</td>
+                  <td>–</td>
+                </tr>
+              ))}
+              {accounts.data?.length === 0 && <tr><td colSpan={4} className="tiny">No staff account yet.</td></tr>}
             </tbody>
           </table>
-        )}
-        <form className="row" onSubmit={createAccount}>
-          <input value={create.username} onChange={(e) => setCreate({ ...create, username: e.target.value })} placeholder="username" autoComplete="off" />
-          <select value={create.role} onChange={(e) => setCreate({ ...create, role: e.target.value as StaffRole })}>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
-          <input type="password" value={create.password} onChange={(e) => setCreate({ ...create, password: e.target.value })} placeholder="password" autoComplete="new-password" />
-          <button type="submit" disabled={action.busy || !create.username.trim() || !create.password}>Create account</button>
-        </form>
+          <div className="btnrow">
+            <span className="tiny">{cur ? `Selected: ${cur.username}` : 'Select an account in the table.'}</span>
+            <button type="button" onClick={() => setChanging(!changing)} disabled={!cur || cur.status === 'Disabled'} aria-expanded={changing}>Change role</button>
+            <button type="button" onClick={disable} disabled={!cur || cur.status === 'Disabled' || action.busy} title={cur?.status === 'Disabled' ? 'already disabled; re-enabling an account has no route in progress 1' : undefined}>Disable</button>
+          </div>
+          {changing && cur && (
+            <form className="frow" onSubmit={saveRole} style={{ flexWrap: 'wrap' }}>
+              <label className="fl" htmlFor="sa-role">Role of {cur.username}</label>
+              <select id="sa-role" value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value as StaffRole })} style={{ flex: '0 1 140px' }}>{ROLES.map((r) => <option key={r} value={r}>{ROLE_NAME[r]}</option>)}</select>
+              <input type="password" value={edit.password} onChange={(e) => setEdit({ ...edit, password: e.target.value })} placeholder="new password (optional)" aria-label="new password" autoComplete="new-password" style={{ flex: '1 1 140px' }} />
+              <button type="submit" className="small primary" disabled={action.busy}>Save</button>
+            </form>
+          )}
+          <div className="tiny" style={{ marginTop: 8 }}>A disabled account can no longer sign in; its past check-ins keep its name.</div>
+        </div>
       </div>
     </>
   );

@@ -1,6 +1,5 @@
-/** Per-venue branding: swap these three values for each bar deployment. */
+/** Per-venue branding: the bar this deployment books tables for (the project document's venue is La Loy Bar). */
 export const VENUE = {
-  name: 'The Blue Note',
-  tagline: 'Live jazz · Bangkok',
-  logoUrl: '/venue-logo.svg',
+  name: 'La Loy Bar',
+  tagline: 'Live music · Bangkok',
 };

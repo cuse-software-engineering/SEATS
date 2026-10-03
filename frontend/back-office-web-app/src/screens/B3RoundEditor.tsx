@@ -1,15 +1,20 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import {
-  api, Badge, ErrorAlert, fmtDateTime, fromLocalInput, type PackagePrice, type Removed, type Round, type RoundTable, type RoundUpdate,
-  TableGrid, type TableType, toLocalInput, type UpcomingRound, useAction, useLoad, type ValidationResult, type ZoneMap, type ZoneMapSummary,
+  api, Badge, ErrorAlert, fmtTHB, fmtTime, fromLocalInput, type PackagePrice, type Removed, type Round, type RoundTable, type RoundUpdate,
+  TableGrid, tableLabel, type TableType, toLocalInput, type UpcomingRound, useAction, useLoad, type ValidationResult, type ZoneMap, type ZoneMapSummary,
 } from '@seats/frontend-shared';
+import { fmtDay, fmtWhen, ValidationBox } from '../parts';
 
-interface Form { name: string; artist: string; date: string; doorsOpenAt: string; startAt: string; bookingOpenAt: string; zoneMapId: string; tablesNotForSale: string; prices: PackagePrice[] }
-const EMPTY: Form = { name: '', artist: '', date: '', doorsOpenAt: '', startAt: '', bookingOpenAt: '', zoneMapId: '', tablesNotForSale: '', prices: [] };
-const parseNumbers = (s: string): number[] => s.split(/[\s,]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n));
+interface Form { name: string; artist: string; date: string; doorsOpenAt: string; startAt: string; bookingOpenAt: string; zoneMapId: string; tablesNotForSale: number[]; prices: PackagePrice[] }
+const EMPTY: Form = { name: '', artist: '', date: '', doorsOpenAt: '', startAt: '', bookingOpenAt: '', zoneMapId: '', tablesNotForSale: [], prices: [] };
+const hours = (from: string | undefined, to: string | undefined): number => Math.round(((new Date(to ?? 0).getTime() - new Date(from ?? 0).getTime()) / 3600e3) * 10) / 10;
+const minutes = (from: string | undefined, to: string | undefined): number => Math.round((new Date(to ?? 0).getTime() - new Date(from ?? 0).getTime()) / 60e3);
 
-/** B3 Round editor (UC-03): the round list, a new round, the details and times, the zone map, tables not for sale,
- *  the package price per zone and table type, validation, the preview as the customer sees it (C3), Publish, Discard. */
+/** B3 Round editor (UC-03, Table D.12), laid out as the wireframe: the round list at the left; in the middle the
+ *  Concert details, the Zone map with the tables not for sale as chips, and the tables for sale and capacity per
+ *  zone; at the right the package price and content per zone and table type as a matrix, the validation result, the
+ *  preview as the Customer sees it (C3), and Save draft, Validate, Preview, Publish (open once the saved round passes
+ *  validation; Validate saves the draft first), Discard. */
 export default function B3RoundEditor() {
   // GET /api/rounds is the customer's upcoming Published rounds (getUpcomingRounds). The back-office also needs the
   // Draft rounds, an open point (KI-17, Appendix D.3): until a listRounds() exists, a Draft is reopened by its id.
@@ -21,49 +26,44 @@ export default function B3RoundEditor() {
   const [newName, setNewName] = useState('');
   const round = useLoad<Round | null>(() => (selected ? api.get<Round>(`/api/rounds/${selected}`) : Promise.resolve(null)), [selected]);
   const [form, setForm] = useState<Form>(EMPTY);
+  const [dirty, setDirty] = useState(false);
   const zoneMap = useLoad<ZoneMap | null>(() => (form.zoneMapId ? api.get<ZoneMap>(`/api/zone-maps/${form.zoneMapId}`) : Promise.resolve(null)), [form.zoneMapId]);
   const preview = useLoad<RoundTable[] | null>(() => (selected ? api.get<RoundTable[]>(`/api/rounds/${selected}/tables`) : Promise.resolve(null)), [selected, round.data]);
+  const [showPreview, setShowPreview] = useState(false);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const action = useAction();
 
   useEffect(() => {
     const r = round.data;
-    if (!r) { setForm(EMPTY); return; }
+    if (!r) { setForm(EMPTY); setValidation(null); setDirty(false); setShowPreview(false); return; }
     setForm({
       name: r.name ?? '', artist: r.artist ?? '', date: r.date ?? '', doorsOpenAt: toLocalInput(r.doorsOpenAt), startAt: toLocalInput(r.startAt),
-      bookingOpenAt: toLocalInput(r.bookingOpenAt), zoneMapId: r.zoneMapId ?? '', tablesNotForSale: (r.tablesNotForSale ?? []).join(', '), prices: r.prices ?? [],
+      bookingOpenAt: toLocalInput(r.bookingOpenAt), zoneMapId: r.zoneMapId ?? '', tablesNotForSale: r.tablesNotForSale ?? [], prices: r.prices ?? [],
     });
     setValidation(null);
+    setDirty(false);
   }, [round.data]);
 
-  // One price row per (zone, table type) present in the chosen map; rows already priced are kept (UC-03 step 9).
-  useEffect(() => {
-    const m = zoneMap.data;
-    if (!m) return;
-    setForm((f) => {
-      const prices = [...f.prices];
-      for (const t of m.tables ?? []) {
-        if (t.zoneId && t.tableTypeId && !prices.some((p) => p.zoneId === t.zoneId && p.tableTypeId === t.tableTypeId)) prices.push({ zoneId: t.zoneId, tableTypeId: t.tableTypeId });
-      }
-      return prices.length === f.prices.length ? f : { ...f, prices };
-    });
-  }, [zoneMap.data, round.data]);
+  // every local change invalidates the last validation result (Publish closes again until the next pass)
+  const edit = (fn: (f: Form) => Form) => { setForm(fn); setDirty(true); setValidation(null); };
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
     const created = await action.run(() => api.post<Round>('/api/rounds', { name: newName.trim() || undefined }));
     if (created?.id) { setNewName(''); setSelected(created.id); }
   };
-  const save = async () => {
+  const save = async (): Promise<Round | undefined> => {
     const body: RoundUpdate = {
       name: form.name || undefined, artist: form.artist || undefined, date: form.date || undefined, doorsOpenAt: fromLocalInput(form.doorsOpenAt),
       startAt: fromLocalInput(form.startAt), bookingOpenAt: fromLocalInput(form.bookingOpenAt), zoneMapId: form.zoneMapId || undefined,
-      tablesNotForSale: parseNumbers(form.tablesNotForSale), prices: form.prices.filter((p) => p.packagePrice !== undefined && Number.isFinite(p.packagePrice)),
+      tablesNotForSale: form.tablesNotForSale, prices: form.prices.filter((p) => p.packagePrice !== undefined && Number.isFinite(p.packagePrice)),
     };
     const saved = await action.run(() => api.put<Round>(`/api/rounds/${selected}`, body));
     if (saved) { round.setData(saved); rounds.reload(); }
+    return saved;
   };
   const validate = async () => {
+    if (dirty && !(await save())) return;
     const r = await action.run(() => api.post<ValidationResult>(`/api/rounds/${selected}/validate`));
     if (r) setValidation(r);
   };
@@ -76,24 +76,46 @@ export default function B3RoundEditor() {
     const r = await action.run(() => api.delete<Removed>(`/api/rounds/${selected}`));
     if (r) { setSelected(null); rounds.reload(); }
   };
-  const setPrice = (i: number, patch: Partial<PackagePrice>) => setForm((f) => ({ ...f, prices: f.prices.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
-  const field = (key: keyof Omit<Form, 'prices'>) => ({ value: form[key], onChange: (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value }) });
-  const typeName = (id: string | undefined) => types.data?.find((t) => t.id === id)?.name ?? id;
-  const zoneName = (id: string | undefined) => zoneMap.data?.zones?.find((z) => z.id === id)?.name ?? id;
+  const togglePreview = () => { if (!showPreview) preview.reload(); setShowPreview(!showPreview); };
+
+  const field = (key: keyof Omit<Form, 'prices' | 'tablesNotForSale'>) => ({ value: form[key], onChange: (e: { target: { value: string } }) => edit((f) => ({ ...f, [key]: e.target.value })) });
+  const setPrice = (zoneId: string, tableTypeId: string, patch: Partial<PackagePrice>) => edit((f) => {
+    const i = f.prices.findIndex((p) => p.zoneId === zoneId && p.tableTypeId === tableTypeId);
+    const prices = i >= 0 ? f.prices.map((p, j) => (j === i ? { ...p, ...patch } : p)) : [...f.prices, { zoneId, tableTypeId, ...patch }];
+    return { ...f, prices };
+  });
+  const mark = (n: number) => edit((f) => ({ ...f, tablesNotForSale: f.tablesNotForSale.includes(n) ? f.tablesNotForSale : [...f.tablesNotForSale, n].sort((a, b) => a - b) }));
+  const unmark = (n: number) => edit((f) => ({ ...f, tablesNotForSale: f.tablesNotForSale.filter((x) => x !== n) }));
+
   const r = round.data;
   const published = r?.status === 'Published';
+  const mapZones = zoneMap.data?.zones ?? [];
+  const mapTables = zoneMap.data?.tables ?? [];
+  const typeName = (id: string | undefined) => types.data?.find((t) => t.id === id)?.name ?? id ?? '';
+  const zoneTitle = (z: { id?: string; name?: string }) => `Zone ${(z.id ?? '').toUpperCase()}${z.name ? ` · ${z.name}` : ''}`;
+  const zoneOf = (n: number) => mapTables.find((t) => t.tableNumber === n)?.zoneId;
+  const occurs = (zoneId: string | undefined, typeId: string) => mapTables.some((t) => t.zoneId === zoneId && t.tableTypeId === typeId);
+  const matrixTypes = (types.data ?? []).filter((ty) => mapTables.some((t) => t.tableTypeId === ty.id));
+  const unmarked = mapTables.filter((t) => t.tableNumber !== undefined && !form.tablesNotForSale.includes(t.tableNumber));
+  // the tables for sale and the seats of each zone, from the chosen map and the tables marked not for sale
+  const perZone = mapZones.map((z) => {
+    const ts = mapTables.filter((t) => t.zoneId === z.id);
+    const forSale = ts.filter((t) => t.tableNumber === undefined || !form.tablesNotForSale.includes(t.tableNumber));
+    return { zone: z, total: ts.length, forSale: forSale.length, seats: forSale.reduce((s, t) => s + (t.capacity ?? 0), 0) };
+  });
+  const total = perZone.reduce((a, z) => ({ forSale: a.forSale + z.forSale, seats: a.seats + z.seats }), { forSale: 0, seats: 0 });
+  const w = r?.checkInWindow;
 
-  const perZone = new Map<string, { name: string; forSale: number; capacity: number }>();
-  for (const t of preview.data ?? []) {
-    const key = t.zoneId ?? '';
-    const z = perZone.get(key) ?? { name: t.zoneName ?? key, forSale: 0, capacity: 0 };
-    if (t.forSale !== false) { z.forSale += 1; z.capacity += t.capacity ?? 0; }
-    perZone.set(key, z);
-  }
+  const item = (id: string | undefined, name: string | undefined, when: string, status: 'Draft' | 'Published') => (
+    <button key={id} type="button" className={`it${id === selected ? ' cur' : ''}`} onClick={() => setSelected(id ?? null)} data-testid={id === selected ? 'round-head' : undefined}>
+      <div className="name">{name || '(unnamed)'}</div>
+      <div className="tiny">{when}</div>
+      <Badge fill={status === 'Published'}>{status}</Badge>
+    </button>
+  );
 
   return (
     <>
-      <h1>Concert rounds</h1>
       <ErrorAlert error={rounds.error} />
       <ErrorAlert error={activeMaps.error} />
       <ErrorAlert error={types.error} />
@@ -101,98 +123,151 @@ export default function B3RoundEditor() {
       <ErrorAlert error={zoneMap.error} />
       <ErrorAlert error={preview.error} />
       <ErrorAlert error={action.error} onClose={action.clear} />
-      <div className="two-col">
-        <div className="card">
-          <h4>Upcoming Published rounds</h4>
-          {rounds.data?.length === 0 && <p className="muted small">No Published round yet.</p>}
-          {rounds.data?.map((u) => (
-            <button key={u.id} type="button" className={`list-item${u.id === selected ? ' active' : ''}`} onClick={() => setSelected(u.id ?? null)}>
-              {u.name || '(unnamed)'} <Badge>{u.status}</Badge>
-              <div className="small muted">{u.artist} · {u.date}</div>
-            </button>
-          ))}
-          <form className="row" onSubmit={create}>
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New round name" />
-            <button type="submit" disabled={action.busy}>New round</button>
+      <div className="cols">
+        {/* ---- the list of rounds */}
+        <div className="list" style={{ width: 170, flex: 'none' }}>
+          <h1 className="hd">Concert rounds</h1>
+          <form onSubmit={create}>
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New round name" aria-label="New round name" />
+            <button type="submit" className="small wide" disabled={action.busy}>+ New round</button>
           </form>
-          <h4>Open a Draft round by id (KI-17)</h4>
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (draftId.trim()) setSelected(draftId.trim()); }}>
-            <input value={draftId} onChange={(e) => setDraftId(e.target.value)} placeholder="round id" />
-            <button type="submit" className="secondary" disabled={!draftId.trim()}>Open</button>
-          </form>
+          {r && !rounds.data?.some((u) => u.id === r.id) && item(r.id, r.name, fmtWhen(r.date, r.startAt), r.status ?? 'Draft')}
+          {rounds.data?.map((u) => item(u.id, u.name, fmtWhen(u.date, u.startAt), 'Published'))}
+          {rounds.data?.length === 0 && !r && <div className="tiny">No Published round yet.</div>}
+          <div className="idbox">
+            <div className="tiny" style={{ marginBottom: 3 }}>Open a Draft by id (KI-17)</div>
+            <form onSubmit={(e) => { e.preventDefault(); if (draftId.trim()) setSelected(draftId.trim()); }}>
+              <input value={draftId} onChange={(e) => setDraftId(e.target.value)} placeholder="round id" aria-label="round id" style={{ flex: 1, minWidth: 0, fontSize: 11.5 }} />
+              <button type="submit" className="small" disabled={!draftId.trim()}>Open</button>
+            </form>
+          </div>
         </div>
 
-        <div>
-          {!r && <div className="card muted">Choose a round, open a Draft by its id, or create one.</div>}
-          {r && (
-            <>
-              <div className="card">
-                <div className="row" data-testid="round-head">
-                  <h2 style={{ margin: 0 }}>{r.name || '(unnamed)'}</h2>
-                  <Badge solid={published}>{r.status}</Badge>
-                  <code className="small muted">{r.id}</code>
-                </div>
-                {published && <p className="small muted">A Published round accepts only the changes of UC-03 AF-3{r.confirmedBookings !== undefined && <>; {r.confirmedBookings} confirmed bookings keep their table</>}.</p>}
-                <div className="grid-2">
-                  <label className="field">Name<input {...field('name')} /></label>
-                  <label className="field">Artist<input {...field('artist')} /></label>
-                  <label className="field">Date (venue local)<input type="date" {...field('date')} /></label>
-                  <label className="field">Doors open<input type="datetime-local" {...field('doorsOpenAt')} /></label>
-                  <label className="field">Start<input type="datetime-local" {...field('startAt')} /></label>
-                  <label className="field">Booking opens (BRULE-07)<input type="datetime-local" {...field('bookingOpenAt')} /></label>
-                  <label className="field">Zone map (Active)
-                    <select {...field('zoneMapId')}><option value="">—</option>{activeMaps.data?.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.tables} tables)</option>)}</select>
-                  </label>
-                  <label className="field">Tables not for sale (numbers, comma-separated)<input {...field('tablesNotForSale')} placeholder="4, 12" /></label>
-                </div>
-                {r.checkInWindow && <p className="small muted">Check-in window: {fmtDateTime(r.checkInWindow.opensAt)} until {fmtDateTime(r.checkInWindow.graceEndsAt)} (BRULE-04, BRULE-05).</p>}
-
-                <h3>Package price per zone and table type (BRULE-08)</h3>
-                <table className="data" data-testid="prices">
-                  <thead><tr><th>Zone</th><th>Table type</th><th>Price (THB)</th><th>Package content</th><th></th></tr></thead>
-                  <tbody>
-                    {form.prices.map((p, i) => (
-                      <tr key={i}>
-                        <td>{zoneName(p.zoneId)}</td>
-                        <td>{typeName(p.tableTypeId)}</td>
-                        <td className="tight"><input type="number" min={0} value={p.packagePrice ?? ''} onChange={(e) => setPrice(i, { packagePrice: e.target.value === '' ? undefined : Number(e.target.value) })} style={{ width: 100 }} /></td>
-                        <td><input value={p.packageContent ?? ''} onChange={(e) => setPrice(i, { packageContent: e.target.value })} /></td>
-                        <td className="tight"><button type="button" className="link" onClick={() => setForm((f) => ({ ...f, prices: f.prices.filter((_, j) => j !== i) }))}>remove</button></td>
-                      </tr>
-                    ))}
-                    {form.prices.length === 0 && <tr><td colSpan={5} className="muted small">Choose a zone map: one row per zone and table type of the map appears here.</td></tr>}
-                  </tbody>
-                </table>
-                <div className="row">
-                  <button type="button" onClick={save} disabled={action.busy}>Save</button>
-                  <button type="button" className="secondary" onClick={validate} disabled={action.busy}>Validate</button>
-                  <button type="button" className="secondary" onClick={publish} disabled={action.busy}>Publish</button>
-                  {!published && <button type="button" className="secondary" onClick={discard} disabled={action.busy}>Discard</button>}
-                </div>
-                {validation && (
-                  <div className={validation.valid ? 'notice' : 'alert'} data-testid="validation">
-                    {validation.valid ? 'The round is valid.' : 'The round is not valid:'}
-                    {validation.problems && validation.problems.length > 0 && <ul className="problems">{validation.problems.map((p, i) => <li key={i}>{p}</li>)}</ul>}
+        {!r && <div className="placeholder grow" style={{ height: 200, borderRadius: 6 }}>Choose a round, open a Draft by its id, or create one.</div>}
+        {r && (
+          <>
+            {/* ---- the details, the zone map, the tables for sale */}
+            <div style={{ width: 312, flex: 'none' }}>
+              <div className="panel">
+                <div className="pt">Concert details</div>
+                <div className="frow"><label className="fl" htmlFor="rd-name">Name</label><input id="rd-name" {...field('name')} /></div>
+                <div className="frow"><label className="fl" htmlFor="rd-artist">Artist</label><input id="rd-artist" {...field('artist')} /></div>
+                <div className="frow"><label className="fl" htmlFor="rd-date">Date</label><input id="rd-date" type="date" {...field('date')} /></div>
+                <div className="frow"><label className="fl" htmlFor="rd-doors">Doors open</label><input id="rd-doors" type="datetime-local" {...field('doorsOpenAt')} /></div>
+                <div className="frow"><label className="fl" htmlFor="rd-start">Start</label><input id="rd-start" type="datetime-local" {...field('startAt')} /></div>
+                <div className="frow"><label className="fl" htmlFor="rd-open">Booking opens</label><input id="rd-open" type="datetime-local" {...field('bookingOpenAt')} /></div>
+                {w && (
+                  <div className="tiny" style={{ marginTop: 6 }}>
+                    Check-in window <b>{fmtTime(w.opensAt)}–{fmtTime(w.graceEndsAt)}</b>: from {hours(w.opensAt, w.startAt)} h before the start until {minutes(w.startAt, w.graceEndsAt)} min after it (business parameters).
                   </div>
                 )}
+                {!w && <div className="tiny" style={{ marginTop: 6 }}>The check-in window follows from the start time and the business parameters once the draft is saved.</div>}
+                {published && <div className="tiny" style={{ marginTop: 4 }}>A Published round accepts only the changes of UC-03 AF-3{r.confirmedBookings !== undefined && <>; {r.confirmedBookings} confirmed bookings keep their table</>}.</div>}
                 {r.parameters && (
-                  <p className="small muted">Parameters snapshot at publish (FR-38): hold {r.parameters.holdPeriodMinutes} min · check-in window {r.parameters.checkInWindowHours} h · grace {r.parameters.gracePeriodMinutes} min · extra person {r.parameters.extraPersonFee} THB.</p>
+                  <div className="tiny" style={{ marginTop: 4 }}>Parameters snapshot at publish (FR-38): hold {r.parameters.holdPeriodMinutes} min · check-in window {r.parameters.checkInWindowHours} h · grace {r.parameters.gracePeriodMinutes} min · extra person {r.parameters.extraPersonFee} THB.</div>
                 )}
               </div>
 
-              <div className="card">
-                <h4>Preview as the customer sees it (C3)</h4>
-                {perZone.size > 0 && (
-                  <table className="data" style={{ marginBottom: 12 }} data-testid="preview-summary">
-                    <thead><tr><th>Zone</th><th className="num">Tables for sale</th><th className="num">Capacity</th></tr></thead>
-                    <tbody>{[...perZone.entries()].map(([id, z]) => <tr key={id}><td>{z.name}</td><td className="num">{z.forSale}</td><td className="num">{z.capacity}</td></tr>)}</tbody>
-                  </table>
-                )}
-                {preview.data && <TableGrid tables={preview.data} />}
+              <div className="panel">
+                <div className="pt">Zone map</div>
+                <div className="frow">
+                  <label className="fl" htmlFor="rd-map">Zone map</label>
+                  <select id="rd-map" {...field('zoneMapId')}>
+                    <option value="">—</option>
+                    {activeMaps.data?.map((m) => <option key={m.id} value={m.id}>{m.name} (Active, {m.tables} tables)</option>)}
+                  </select>
+                </div>
+                <div className="tiny" style={{ margin: '6px 0 3px' }}>Tables not for sale in this round</div>
+                <div data-testid="not-for-sale">
+                  {form.tablesNotForSale.map((n) => (
+                    <button key={n} type="button" className="chip" onClick={() => unmark(n)} title="put this table back for sale" aria-label={`table ${tableLabel(zoneOf(n), n)} not for sale, remove`}>{tableLabel(zoneOf(n), n)} ×</button>
+                  ))}
+                  <select className="chip add" value="" onChange={(e) => { if (e.target.value) mark(Number(e.target.value)); }} aria-label="mark a table not for sale" disabled={!zoneMap.data || unmarked.length === 0}>
+                    <option value="">+ mark a table</option>
+                    {unmarked.map((t) => <option key={t.tableNumber} value={t.tableNumber}>{tableLabel(t.zoneId, t.tableNumber)} · {typeName(t.tableTypeId)}</option>)}
+                  </select>
+                </div>
               </div>
-            </>
-          )}
-        </div>
+
+              <div className="panel">
+                <div className="pt">Tables for sale and capacity per zone</div>
+                <table className="tbl" data-testid="sale-summary">
+                  <thead><tr><th>Zone</th><th className="num">For sale</th><th className="num">Seats</th></tr></thead>
+                  <tbody>
+                    {perZone.map((z) => <tr key={z.zone.id}><td>{zoneTitle(z.zone)}</td><td className="num">{z.forSale} of {z.total}</td><td className="num">{z.seats}</td></tr>)}
+                    {perZone.length === 0 && <tr><td colSpan={3} className="tiny">Choose a zone map.</td></tr>}
+                    {perZone.length > 0 && <tr><td><b>Total</b></td><td className="num"><b>{total.forSale}</b></td><td className="num"><b>{total.seats}</b></td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ---- the prices, the validation, the preview, the buttons */}
+            <div className="grow" style={{ minWidth: 300 }}>
+              <div className="panel">
+                <div className="pt">Package price and content per zone and table type</div>
+                <table className="tbl" data-testid="prices">
+                  <thead>
+                    <tr><th style={{ width: 120 }}>Table type</th>{mapZones.map((z) => <th key={z.id}>{zoneTitle(z)}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {matrixTypes.map((ty) => (
+                      <tr key={ty.id}>
+                        <td>{ty.name}</td>
+                        {mapZones.map((z) => {
+                          if (!occurs(z.id, ty.id)) return <td key={z.id}><span className="tiny">none in this zone</span></td>;
+                          const p = form.prices.find((x) => x.zoneId === z.id && x.tableTypeId === ty.id);
+                          const missing = p?.packagePrice === undefined;
+                          return (
+                            <td key={z.id} className={`cell-stack${missing ? ' err' : ''}`}>
+                              <input type="number" min={0} className="price" value={p?.packagePrice ?? ''} placeholder="price missing" aria-label={`price of ${ty.name} in ${zoneTitle(z)}, THB`}
+                                onChange={(e) => setPrice(z.id ?? '', ty.id, { packagePrice: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                              <input value={p?.packageContent ?? ''} placeholder="package content" aria-label={`package content of ${ty.name} in ${zoneTitle(z)}`}
+                                onChange={(e) => setPrice(z.id ?? '', ty.id, { packageContent: e.target.value })} />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                    {matrixTypes.length === 0 && <tr><td colSpan={1 + mapZones.length} className="tiny">Choose a zone map: one row per table type of the map and one column per zone appear here (BRULE-08).</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="cols" style={{ marginTop: 10 }}>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  {validation
+                    ? <ValidationBox result={validation} hint={!validation.valid ? 'Publish opens once the round passes validation.' : published ? `The round is valid and Published; no other Published round overlaps ${fmtDay(form.date)}.` : `Times are in order and no Published round overlaps ${fmtDay(form.date)}. Publish is open.`} />
+                    : <div className="tiny" style={{ marginTop: 10 }}>{published ? 'This round is Published; the Customer can book it.' : `Validate ${dirty ? 'saves the draft and ' : ''}checks the times, the map and the prices; Publish opens once the round passes.`}</div>}
+                </div>
+                <button type="button" className="placeholder preview-box" onClick={togglePreview} aria-pressed={showPreview} title="the table map as the Customer sees it (C3)">
+                  Preview:<br />as the Customer<br />sees it (C3)
+                </button>
+              </div>
+              {showPreview && (
+                <div className="panel" data-testid="preview" style={{ marginTop: 10 }}>
+                  <div className="pt">Preview: as the Customer sees it (C3){dirty ? <span className="tiny"> · of the saved draft</span> : null}</div>
+                  {preview.data && (
+                    <TableGrid tables={preview.data} size={0.85}
+                      zoneFooter={(z) => {
+                        const lines = new Map<string, string>();
+                        for (const t of z.tables) if (t.forSale !== false && t.tableTypeId && !lines.has(t.tableTypeId)) lines.set(t.tableTypeId, `${t.tableTypeName ?? t.tableTypeId} ${fmtTHB(t.packagePrice)}`);
+                        return <div className="tiny">{[...lines.values()].join(' · ') || 'no table for sale'}</div>;
+                      }} />
+                  )}
+                </div>
+              )}
+
+              <div className="btnrow">
+                <button type="button" onClick={save} disabled={action.busy}>{published ? 'Save' : 'Save draft'}</button>
+                <button type="button" onClick={validate} disabled={action.busy}>Validate</button>
+                <button type="button" onClick={togglePreview} aria-pressed={showPreview}>Preview</button>
+                <button type="button" className="primary" onClick={publish} disabled={action.busy || published || !validation?.valid}>Publish</button>
+                {!published && <button type="button" onClick={discard} disabled={action.busy}>Discard</button>}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
