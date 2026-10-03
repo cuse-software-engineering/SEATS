@@ -49,7 +49,9 @@ calls run in its terminals.
   the incognito window included. If one is missing, the Ports panel (**Ports** tab next to the terminal, or
   **Forward a Port**) adds it.
 - **The browser-based editor**: the Ports panel gives `https://<codespace>-5173.app.github.dev` and `…-5174…` instead
-  of localhost; the Vite configs allow that name. A private port asks the browser to sign in to GitHub, which the
+  of localhost; the Vite configs allow that name. For the Codespace this runbook was written in they are
+  <https://vigilant-fishstick-r79q4jq4gqvc446-5174.app.github.dev> (back-office) and
+  <https://vigilant-fishstick-r79q4jq4gqvc446-5173.app.github.dev> (customer app). A private port asks the browser to sign in to GitHub, which the
   incognito window cannot do with your cookie: set the two ports to **Public** for the take (right-click the port,
   Port Visibility), and back to Private afterwards.
 
@@ -131,8 +133,10 @@ called a minute ago.
 
 ### 4:15 Git and the deployment (30 s)
 
-The GitHub contributors graph and the branches; the same backend on Render and the two apps on Vercel
-(`https://seats-back-office.vercel.app`, `https://seats-customer.vercel.app`).
+The repository <https://github.com/cuse-software-engineering/SEATS>: its contributors graph
+(<https://github.com/cuse-software-engineering/SEATS/graphs/contributors>) and the branches; the same backend on
+Render (<https://seats-monolith.onrender.com/health>) and the two apps on Vercel
+(<https://seats-back-office.vercel.app>, <https://seats-customer.vercel.app>).
 
 ## Fallbacks
 
