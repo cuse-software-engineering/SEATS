@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import grpc from '@grpc/grpc-js';
-import { DomainError, InfrastructureError, fromCollaborator, isGrpcServiceError, toServiceError } from '../src/index.js';
+import { DomainError, InfrastructureError, fromCollaborator, isGrpcServiceError, refusalOf, toServiceError } from '../src/index.js';
 
 const quiet = () => {};
 const details = (e: grpc.ServiceError): unknown => { const raw = e.metadata.get('error-details-bin')[0]; return raw ? JSON.parse(raw.toString()) : undefined; };
@@ -34,6 +34,14 @@ test('a defect is INTERNAL with a reference only; the stack goes to the log', ()
   assert.match(e.details, /^internal error \(ref [0-9a-f]{8}\)$/);
   assert.equal(lines.length, 1); assert.match(lines[0], /^\[defect [0-9a-f]{8}\] TypeError: Cannot read properties/); assert.match(lines[0], /\n\s+at /);
   assert.doesNotMatch(e.details, /Cannot read/);
+});
+
+test('refusalOf() reads the kind of a collaborator refusal, null for anything else', () => {
+  assert.equal(refusalOf(serviceError(grpc.status.NOT_FOUND, 'round not found')), 'not_found');
+  assert.equal(refusalOf({ code: grpc.status.FAILED_PRECONDITION }), 'conflict');   // a stub in a unit test carries the code only
+  assert.equal(refusalOf(serviceError(grpc.status.INVALID_ARGUMENT, 'x')), 'invalid');
+  assert.equal(refusalOf(serviceError(grpc.status.UNAVAILABLE, 'down')), null);
+  assert.equal(refusalOf(new Error('x')), null); assert.equal(refusalOf(undefined), null);
 });
 
 test('a collaborator that did not answer is an infrastructure error; its own refusals pass through', () => {

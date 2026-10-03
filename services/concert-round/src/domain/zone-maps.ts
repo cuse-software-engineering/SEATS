@@ -3,16 +3,14 @@
 // an Active map keeps every table a published round has booked (AF-1). A Draft can be discarded.
 import { randomUUID } from 'node:crypto';
 import { DomainError, InfrastructureError } from '@seats/errors/src/index.js';
-import { rounds, zoneMaps } from '../repository.js';
-import { adapters } from '../adapters.js';
-import { tableAvailability } from '../clients.js';
+import { ports } from './ports.js';
 import { iso, now, requireZoneMap, tableTypesById, zoneSummary, type ZoneMapView } from './shared.js';
-import type { ValidationResult, Zone, ZoneMap, ZoneMapStatus, ZoneMapTable } from '../model.js';
+import type { ValidationResult, Zone, ZoneMap, ZoneMapStatus, ZoneMapTable } from './model.js';
 export type { ZoneMapView, ZoneSummary } from './shared.js';
 
 export async function createZoneMap({ name }: { name?: string } = {}): Promise<ZoneMap> {           // UC-04 steps 1–2
   const map: ZoneMap = { id: randomUUID(), name: name ?? 'Untitled zone map', status: 'Draft', imageUrl: '', zones: [], tables: [], createdAt: iso(now()) };
-  return zoneMaps.save(map);
+  return ports.zoneMaps.save(map);
 }
 
 export async function uploadZoneMapImage(id: string, { fileName }: { fileName?: string }): Promise<ZoneMap> {   // UC-04 step 3, EF-3
@@ -20,18 +18,18 @@ export async function uploadZoneMapImage(id: string, { fileName }: { fileName?: 
   if (!fileName) throw new DomainError('invalid', 'fileName is required');
   let url: string;
   try {
-    ({ url } = await adapters.mediaStorage.store(id, fileName));                                   // the Media Storage Adapter (FR-39)
+    ({ url } = await ports.mediaStorage.store(id, fileName));                                   // the Media Storage Adapter (FR-39)
   } catch (e) {                                                                                    // EF-3: the map keeps its old image
     throw new InfrastructureError('the object storage', 'the image of the venue could not be stored; the zone map is unchanged', { cause: e });
   }
   map.imageUrl = url;
-  return zoneMaps.save(map);
+  return ports.zoneMaps.save(map);
 }
 
 async function bookedTablesOfMap(mapId: string): Promise<Set<number>> {
   const numbers = new Set<number>();
-  for (const r of await rounds.publishedOnMap(mapId)) {
-    const status = await tableAvailability.getRoundTableStatus(r.id).catch(() => ({ tables: [] }));
+  for (const r of await ports.rounds.publishedOnMap(mapId)) {
+    const status = await ports.tableAvailability.getRoundTableStatus(r.id).catch(() => ({ tables: [] }));
     for (const t of status.tables) if (['BOOKED', 'OCCUPIED'].includes(t.status)) numbers.add(t.tableNumber);
   }
   return numbers;
@@ -54,12 +52,12 @@ export async function updateZoneMap(id: string, { name, zones, tables }: ZoneMap
   if (name !== undefined) map.name = name;
   if (zones !== undefined) map.zones = zones.map((z) => ({ id: z.id ?? randomUUID(), name: z.name ?? '' }));
   if (tables !== undefined) map.tables = tables.map((t) => ({ tableNumber: t.tableNumber ?? 0, zoneId: t.zoneId ?? '', tableTypeId: t.tableTypeId ?? '', capacity: t.capacity ?? 0, x: t.x ?? 0, y: t.y ?? 0 }));
-  await zoneMaps.save(map);
+  await ports.zoneMaps.save(map);
   return getZoneMap(id);                                                                          // UC-04 step 7: tables and capacity per zone
 }
 
 export const listZoneMaps = async ({ status }: { status?: string } = {}) =>
-  (await (status ? zoneMaps.withStatus(status as ZoneMapStatus) : zoneMaps.all())).map((m) => ({ id: m.id, name: m.name, status: m.status, tables: m.tables.length }));
+  (await (status ? ports.zoneMaps.withStatus(status as ZoneMapStatus) : ports.zoneMaps.all())).map((m) => ({ id: m.id, name: m.name, status: m.status, tables: m.tables.length }));
 export const getZoneMap = async (id: string): Promise<ZoneMapView> => { const m = await requireZoneMap(id); return { ...m, summary: zoneSummary(m) }; };   // UC-04 steps 7, 10; UC-03 step 7
 
 export async function validateZoneMap(id: string): Promise<ValidationResult> {                     // UC-04 S-1 (FR-74)
@@ -88,12 +86,12 @@ export async function activateZoneMap(id: string): Promise<ZoneMap> {           
   const v = await validateZoneMap(id);
   if (!v.valid) throw new DomainError('invalid', 'the zone map is not valid', v.problems);
   map.status = 'Active';
-  return zoneMaps.save(map);
+  return ports.zoneMaps.save(map);
 }
 
 export async function discardDraftZoneMap(id: string): Promise<{ removed: boolean }> {             // D of CRUD
   const map = await requireZoneMap(id);
   if (map.status !== 'Draft') throw new DomainError('conflict', 'only a Draft zone map can be discarded');
-  await zoneMaps.remove(id);
+  await ports.zoneMaps.remove(id);
   return { removed: true };
 }

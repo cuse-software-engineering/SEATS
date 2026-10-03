@@ -2,7 +2,7 @@
 // driven through the routes the Back-office Web App calls (Appendix D, screens B5 and B6).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { adapters as mediaAdapters, type FakeMediaStorage } from '@seats/concert-round/src/adapters.js';
+import { adapters as mediaAdapters, type FakeMediaStorage } from '@seats/concert-round/src/infrastructure/adapters.js';
 import { activeZoneMap, call, customer, defineTableTypes, futureDay, heldBooking, inProcessOnly, manager, PRICES, publishedRound, schedule, TABLES } from './harness.js';
 
 test('UC-04 basic flow Create Venue Zone Map', async () => {

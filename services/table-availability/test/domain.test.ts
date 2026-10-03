@@ -1,8 +1,10 @@
 // Unit tests of the Table Availability Service domain (no collaborators): the read model of the table map (ADR-13).
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+
+wire();   // binds the in-memory repositories to the domain's ports once
 
 const ROUND = { roundId: 'r1', tables: [{ tableNumber: 1 }, { tableNumber: 2, forSale: true }, { tableNumber: 3, forSale: false }] };
 const ref = (tableNumber: number, bookingId = 'b1') => ({ roundId: 'r1', tableNumber, bookingId });

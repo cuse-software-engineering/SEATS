@@ -2,11 +2,13 @@
 // records each push, and the retry job of FR-22.
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { adapters, LoggingLineMessaging } from '../src/adapters.js';
-import { messages } from '../src/repository.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+import { adapters, LoggingLineMessaging } from '../src/infrastructure/adapters.js';
+import { messages } from '../src/infrastructure/repositories.js';
 import type { DomainErrorKind } from '@seats/errors/src/index.js';
+
+wire();   // binds the repositories and the LINE adapter to the domain's ports, once
 
 const rejected = (p: Promise<unknown>, kind: DomainErrorKind) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const REQUEST = { customerId: 'U-somchai', bookingId: 'b1', roundName: 'Friday Live', tableNumber: 5 };

@@ -1,9 +1,10 @@
 // Unit tests of the Media Storage Adapter behind uploadZoneMapImage() (UC-04 step 3 and EF-3, FR-39).
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { adapters, FakeMediaStorage } from '../src/adapters.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { adapters, FakeMediaStorage } from '../src/infrastructure/adapters.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+wire();   // the in-memory repositories and the adapter behind the domain's ports, once per process
 
 let storage: FakeMediaStorage;
 beforeEach(async () => { await resetStore(); storage = new FakeMediaStorage(); adapters.mediaStorage = storage; });

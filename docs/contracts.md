@@ -2,11 +2,11 @@
 
 Agreed before code (tasks.txt, section 2). Operation names are those of Table 5.3 of the project document. Every
 service has exactly one API, gRPC, described by its `.proto` file in `proto/`; the messages are the types of the
-owning service's `src/model.ts`, derived from the data model in [data-model.md](data-model.md). The API Gateway is
+owning service's `src/domain/model.ts`, derived from the data model in [data-model.md](data-model.md). The API Gateway is
 the only REST API of the system (ADR-12): each route below is one gRPC call on the owning service. The path
 parameters, the query and the JSON body become the request message, the response message is the JSON answer, and
 the caller's identity travels as the gRPC metadata `x-user-id` and `x-role` (fake auth in progress 1). A service
-never speaks REST, and a service never calls another service through the gateway. Each service serves its contract from `src/api.ts`, its API layer, which `src/grpc.ts` exposes over gRPC and which the monolith mode of `monolith/` calls in-process (ADR-14).
+never speaks REST, and a service never calls another service through the gateway. Each service serves its contract from `src/api/handlers.ts`, its API layer, which `src/api/grpc.ts` exposes over gRPC and which the monolith mode of `monolith/` calls in-process (ADR-14).
 
 ## API Gateway (REST :4000)
 

@@ -1,10 +1,12 @@
 // Unit tests of the Concert Round Service domain: table types and zone maps (UC-04). The Table Availability client
-// is replaced by a stub on the client object itself (creating the gRPC client does not connect).
+// is replaced by a stub on the client object itself, which the port bound by wire() delegates to (creating the gRPC
+// client does not connect).
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { tableAvailability } from '../src/clients.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { tableAvailability } from '../src/infrastructure/clients.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+wire();   // the in-memory repositories and the client object behind the domain's ports, once per process
 
 const refused = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const ZONES = [{ id: 'A', name: 'Zone A' }, { id: 'B', name: 'Zone B' }];

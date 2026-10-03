@@ -1,9 +1,11 @@
 // Unit tests of the Payment Service domain: the Payment Gateway behind its adapter (ADR-11). No collaborator is called.
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { adapters, SimulatedPaymentGateway, type PaymentGatewayAdapter } from '../src/adapters.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { adapters, SimulatedPaymentGateway, type PaymentGateway } from '../src/infrastructure/adapters.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+
+wire();   // the in-memory repository and the simulated gateway behind the domain's ports; beforeEach swaps the gateway on the adapters holder
 
 const refused = (fn: () => Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(fn, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const rejected = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
@@ -27,7 +29,7 @@ describe('createPaymentRequest', () => {
     assert.equal(gateway.checkouts.length, 0);
   });
   test('any adapter serves: a test double that answers another URL', async () => {
-    const double: PaymentGatewayAdapter = { createCheckout: async ({ paymentId }) => ({ checkoutUrl: `https://pay.test/${paymentId}` }), verifySignature: () => true };
+    const double: PaymentGateway = { createCheckout: async ({ paymentId }) => ({ checkoutUrl: `https://pay.test/${paymentId}` }), verifySignature: () => true };
     adapters.paymentGateway = double;
     const r = await d.createPaymentRequest(REQUEST);
     assert.equal(r.checkoutUrl, `https://pay.test/${r.paymentId}`);

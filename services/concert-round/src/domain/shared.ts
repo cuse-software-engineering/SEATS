@@ -2,23 +2,23 @@
 // per-zone summary of a map, the check-in window of a round (BRULE-04, BRULE-05) and the patch of a round's fields.
 // Internal to the folder: index.ts re-exports its types through the use-case modules, never the helpers.
 import { DomainError } from '@seats/errors/src/index.js';
-import { rounds, tableTypes, zoneMaps } from '../repository.js';
-import type { BusinessParameters, CheckInWindow, Round, TableType, ZoneMap } from '../model.js';
+import { ports } from './ports.js';
+import type { BusinessParameters, CheckInWindow, Round, TableType, ZoneMap } from './model.js';
 
 export const now = () => new Date();
 export const iso = (d: string | number | Date) => new Date(d).toISOString();
 
 export async function requireZoneMap(id: string): Promise<ZoneMap> {
-  const m = await zoneMaps.get(id);
+  const m = await ports.zoneMaps.get(id);
   if (!m) throw new DomainError('not_found', `zone map ${id} not found`);
   return m;
 }
 export async function requireRound(id: string): Promise<Round> {
-  const r = await rounds.get(id);
+  const r = await ports.rounds.get(id);
   if (!r) throw new DomainError('not_found', `round ${id} not found`);
   return r;
 }
-export const tableTypesById = async (): Promise<Map<string, TableType>> => new Map((await tableTypes.all()).map((t) => [t.id, t]));   // one read for a whole map
+export const tableTypesById = async (): Promise<Map<string, TableType>> => new Map((await ports.tableTypes.all()).map((t) => [t.id, t]));   // one read for a whole map
 
 export interface ZoneSummary { zoneId: string; name: string; tables: number; capacity: number }
 export type ZoneMapView = ZoneMap & { summary: ZoneSummary[] };

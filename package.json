@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "proto": "proto-loader-gen-types --keepCase=false --longs=Number --defaults=true --grpcLib=@grpc/grpc-js --outDir=proto/gen proto/*.proto",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && node scripts/check-layers.mjs",
     "build": "npm run build --workspaces --if-present",
     "dev": "concurrently -n gateway,round,tables,booking,payment,notify,staff -c green,magenta,cyan,yellow,blue,white,gray \"npm -w gateway run dev\" \"npm -w services/concert-round run dev\" \"npm -w services/table-availability run dev\" \"npm -w services/booking run dev\" \"npm -w services/payment run dev\" \"npm -w services/notification run dev\" \"npm -w services/staff-account run dev\"",
     "test": "npm test --workspaces --if-present",
@@ -22,7 +22,8 @@
     "build:frontend": "npm run build -w frontend/shared -w frontend/customer-web-app -w frontend/back-office-web-app",
     "dev:mono": "npm -w monolith run dev",
     "test:e2e": "npm -w frontend/e2e run e2e",
-    "test:api": "node scripts/test-api.mjs"
+    "test:api": "node scripts/test-api.mjs",
+    "check:layers": "node scripts/check-layers.mjs"
   },
   "devDependencies": {
     "@grpc/proto-loader": "^0.7.13",

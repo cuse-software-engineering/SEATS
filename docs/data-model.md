@@ -5,7 +5,7 @@ database: a `roundId` in the Booking DB is a reference by identifier, not a fore
 from another it asks by gRPC. The diagrams are the source of the types; the chain is
 
 ```
-ER diagram (this file)  ->  src/model.ts of the service     the entities as TypeScript types, used by domain.ts and store.ts
+ER diagram (this file)  ->  src/domain/model.ts of the service  the entities as TypeScript types, used by the rules and the repositories
                         ->  proto/*.proto messages          the projection that crosses services (only what a caller needs)
                         ->  gateway routes (contracts.md)   the same messages as JSON, one route per method (parameters snapshot, version, …)
 ```

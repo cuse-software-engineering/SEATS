@@ -2,8 +2,10 @@
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DomainErrorKind } from '@seats/errors/src/index.js';
-import * as d from '../src/domain.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+
+wire();   // binds the repositories over the (in-memory) store to the domain's ports, once per test module
 
 const refused = (fn: () => Promise<unknown>, kind: DomainErrorKind) => assert.rejects(fn, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const byName = async (username: string) => (await d.listStaffAccounts()).find((a) => a.username === username);

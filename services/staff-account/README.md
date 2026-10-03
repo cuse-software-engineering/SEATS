@@ -10,7 +10,7 @@ Progress 1 seeds three accounts at start, each with the password equal to the us
 signs everyone out. A wrong password or a Disabled account answers UNAUTHENTICATED (401 at the gateway). The gateway
 still trusts the `x-user-id` / `x-role` headers: checking the bearer token on every staff route comes in progress 2.
 
-- `src/domain.ts` — `signIn()`, `signOut()`, `createStaffAccount()`, `listStaffAccounts()`, `updateStaffAccount()`, `disableStaffAccount()`, plus `seedStaffAccounts()`.
-- `src/repository.ts` — `accounts` and `sessions`, the repositories the domain reads and writes through (one per aggregate).
-- `src/store.ts` — the Staff Account DB: in memory, or MongoDB by configuration (ADR-06).
-- `src/model.ts`, `src/grpc.ts`, `src/server.ts` — transport only.
+- `src/domain/` — the pure core: `accounts.ts` holds `signIn()`, `signOut()`, `createStaffAccount()`, `listStaffAccounts()`, `updateStaffAccount()`, `disableStaffAccount()` and `seedStaffAccounts()`; `model.ts` the data model; `repository.ts` the repository interfaces and `ports.ts` the ports the rules reach them through; `index.ts` is the barrel.
+- `src/infrastructure/` — `store.ts`, the Staff Account DB (in memory, or MongoDB by configuration, ADR-06); `repositories.ts`, `accounts` and `sessions` over it (one per aggregate); `index.ts` with `wire()`, which binds them to the domain's ports.
+- `src/api/` — `handlers.ts`, one function per method of `staff_account.proto`; `grpc.ts`, the gRPC server around it plus the health check.
+- `src/server.ts` — connects the store, wires the ports, seeds the accounts and starts gRPC.

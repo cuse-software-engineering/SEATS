@@ -6,6 +6,8 @@ ARG SERVICE
 ENV SERVICE=$SERVICE
 COPY package.json tsconfig.base.json ./
 COPY proto/package.json proto/
+COPY packages/errors/package.json packages/errors/
+COPY packages/store/package.json packages/store/
 COPY gateway/package.json gateway/
 COPY monolith/package.json monolith/
 COPY services/concert-round/package.json services/concert-round/
@@ -16,6 +18,7 @@ COPY services/notification/package.json services/notification/
 COPY services/staff-account/package.json services/staff-account/
 RUN npm install
 COPY proto ./proto
+COPY packages ./packages
 COPY gateway ./gateway
 COPY monolith ./monolith
 COPY services ./services

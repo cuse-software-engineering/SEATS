@@ -1,8 +1,10 @@
 // Unit tests of the Booking Service domain: the customer profile (UC-09, FR-10, BRULE-11). No collaborator is called.
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
+
+wire();   // binds the in-memory repositories to the domain's ports
 
 const rejected = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const ME = 'U-somchai';

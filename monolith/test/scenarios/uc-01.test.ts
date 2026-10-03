@@ -3,7 +3,7 @@
 // payment: step 15 answers 501, so steps 16 to 19 and the LINE notices (S-1, EF-3) are progress 2.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expireUnpaidBookings } from '@seats/booking/src/domain.js';
+import { expireUnpaidBookings } from '@seats/booking/src/domain/index.js';
 import { anonymous, call, customer, heldBooking, inProcessOnly, manager, minutesFromNow, poll, publishedRound, tableStatus } from './harness.js';
 
 test('UC-01 basic flow Reserve a Specific Table', async () => {

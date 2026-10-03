@@ -2,21 +2,29 @@
 // objects of the API Gateway and of the services at the API layers of the other services, in this process, and starts
 // what the service processes would start on their own (the seeded staff accounts, the hold-expiry job).
 import * as gateway from '@seats/gateway/src/clients.js';
-import * as bookingClients from '@seats/booking/src/clients.js';
-import * as roundClients from '@seats/concert-round/src/clients.js';
-import { api as roundApi, toServiceError as roundError } from '@seats/concert-round/src/api.js';
-import { api as tableApi, toServiceError as tableError } from '@seats/table-availability/src/api.js';
-import { api as bookingApi, toServiceError as bookingError } from '@seats/booking/src/api.js';
-import { api as paymentApi, toServiceError as paymentError } from '@seats/payment/src/api.js';
-import { api as notificationApi, toServiceError as notificationError } from '@seats/notification/src/api.js';
-import { api as staffApi, toServiceError as staffError } from '@seats/staff-account/src/api.js';
-import { seedStaffAccounts } from '@seats/staff-account/src/domain.js';
-import { expireUnpaidBookings } from '@seats/booking/src/domain.js';
-import { retryFailedMessages } from '@seats/notification/src/domain.js';
+import * as bookingClients from '@seats/booking/src/infrastructure/clients.js';
+import * as roundClients from '@seats/concert-round/src/infrastructure/clients.js';
+import { api as roundApi, toServiceError as roundError } from '@seats/concert-round/src/api/handlers.js';
+import { api as tableApi, toServiceError as tableError } from '@seats/table-availability/src/api/handlers.js';
+import { api as bookingApi, toServiceError as bookingError } from '@seats/booking/src/api/handlers.js';
+import { api as paymentApi, toServiceError as paymentError } from '@seats/payment/src/api/handlers.js';
+import { api as notificationApi, toServiceError as notificationError } from '@seats/notification/src/api/handlers.js';
+import { api as staffApi, toServiceError as staffError } from '@seats/staff-account/src/api/handlers.js';
+import { wire as wireRounds } from '@seats/concert-round/src/infrastructure/index.js';
+import { wire as wireTables } from '@seats/table-availability/src/infrastructure/index.js';
+import { wire as wireBookings } from '@seats/booking/src/infrastructure/index.js';
+import { wire as wirePayments } from '@seats/payment/src/infrastructure/index.js';
+import { wire as wireNotifications } from '@seats/notification/src/infrastructure/index.js';
+import { wire as wireStaff } from '@seats/staff-account/src/infrastructure/index.js';
+import { seedStaffAccounts } from '@seats/staff-account/src/domain/index.js';
+import { expireUnpaidBookings } from '@seats/booking/src/domain/index.js';
+import { retryFailedMessages } from '@seats/notification/src/domain/index.js';
 import { inProcess, serviceDefinition } from './inprocess.js';
 
 /** Rewires every client to in-process calls. Call it before the gateway's route table loads (it binds the client methods). */
 export async function wireMonolith(): Promise<void> {
+  // each service binds its own infrastructure to its domain's ports (repositories, adapters, the client objects patched below)
+  for (const wire of [wireRounds, wireTables, wireBookings, wirePayments, wireNotifications, wireStaff]) wire();
   const round = inProcess(serviceDefinition('concert_round.proto', 'seats', 'concertround', 'v1', 'ConcertRound'), roundApi, roundError);
   const tables = inProcess(serviceDefinition('table_availability.proto', 'seats', 'tableavailability', 'v1', 'TableAvailability'), tableApi, tableError);
   const bookings = inProcess(serviceDefinition('booking.proto', 'seats', 'booking', 'v1', 'Bookings'), bookingApi, bookingError);

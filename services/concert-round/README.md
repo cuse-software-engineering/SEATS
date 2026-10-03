@@ -5,21 +5,20 @@ The venue and events context: zone maps, table types, concert rounds, package pr
 routes onto it (`docs/contracts.md`), and the Booking Service calls its three reads. Calls the Table Availability
 Service by gRPC when a round is published and for the sold-out status and booked tables.
 
-- `src/domain/` — one function per operation of Table 5.3, plus `discardDraftZoneMap()` and `discardDraftRound()`,
-  one file per use case: `business-parameters.ts` (UC-07), `table-types.ts` (FR-37), `zone-maps.ts` (UC-04),
-  `rounds.ts` (UC-03, publishing included), `shared.ts` (the helpers they share, not exported) and `index.ts`, the
-  barrel; `src/domain.ts` re-exports that barrel so every caller keeps importing `./domain.js`. Every operation is
-  asynchronous: it awaits the Round DB and answers a promise.
-- `src/repository.ts` — one repository per aggregate (`zoneMaps`, `tableTypes`, `rounds`) and one for the single
-  `businessParameters` document, each an interface in the words of the domain (`get`, `save`, `remove`, `all`,
-  `withStatus`, `published`, `publishedOnMap`) implemented once over `collection<T>()` of `store.ts`; the domain
-  imports these objects and never a collection.
-- `src/store.ts` — the Round DB (ADR-06): binds this service to the shared repository package `@seats/store`
-  (`packages/store`). `repository.ts` takes `collection<T>(name)` handles at module load and talks to the
-  `get`/`put`/`insert`/`delete`/`list`/`find` contract only; which implementation answers (MongoDB or memory) is
-  chosen once, by `connectStore()` at start-up, so the domain and every test are the same against both. Reads answer
-  copies, so an operation that changes a document `save()`s it back.
-- `src/model.ts`, `src/grpc.ts`, `src/clients.ts`, `src/server.ts` — transport only.
+- `src/domain/` — the pure core: `model.ts` (the types of the Round DB), `repository.ts` (the repository interfaces,
+  one per aggregate, in the words of the domain), `ports.ts` (what the rules need from outside — the repositories, the
+  Media Storage port, the Table Availability client — and the `ports` holder they call), one file per use case
+  (`business-parameters.ts` UC-07, `table-types.ts` FR-37, `zone-maps.ts` UC-04, `rounds.ts` UC-03 with publishing,
+  `shared.ts` the helpers they share, not exported) and `index.ts`, the barrel. Imports only `@seats/errors` and the
+  message types of `@seats/proto`; every operation awaits the Round DB and answers a promise.
+- `src/infrastructure/` — the implementations of the ports: `store.ts` (the Round DB over `@seats/store`, ADR-06),
+  `repositories.ts` (the repositories over `collection<T>()`; nothing else touches a collection), `adapters.ts` (the
+  Media Storage Adapter and its fake), `clients.ts` (the gRPC client of the Table Availability Service, every call with
+  a deadline) and `index.ts`, whose `wire()` binds them to the domain's ports through delegates, so a test that swaps
+  the adapter and the monolith that patches the client object are followed.
+- `src/api/` — `handlers.ts`, one function per method of `concert_round.proto`, request message in, response message
+  out, the domain's failures mapped by `toServiceError`; `grpc.ts`, the gRPC server over the handlers plus the health check.
+- `src/server.ts` — the composition root: `connectStore()`, `wire()`, `startGrpc()`.
 
 Failures are the classes of `@seats/errors` (`packages/errors`): a rule that says no is a `DomainError` whose `kind`
 (`invalid`, `not_found`, `conflict`, `not_implemented`) the shared `toServiceError()` maps to the gRPC status and the

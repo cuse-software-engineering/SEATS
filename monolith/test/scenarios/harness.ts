@@ -23,7 +23,7 @@ if (!EXTERNAL) {
   const { createApp } = await import('@seats/gateway/src/app.js');
   const server = createApp().listen(0);
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  const stores = await Promise.all([import('@seats/concert-round/src/store.js'), import('@seats/table-availability/src/store.js'), import('@seats/booking/src/store.js')]);
+  const stores = await Promise.all([import('@seats/concert-round/src/infrastructure/index.js'), import('@seats/table-availability/src/infrastructure/index.js'), import('@seats/booking/src/infrastructure/index.js')]);
   after(() => server.close());
   before(async () => { for (const s of stores) await s.resetStore(); });
 }

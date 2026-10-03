@@ -1,11 +1,12 @@
 // Unit tests of the Concert Round Service domain: rounds (UC-03) and the customer's list (UC-01). The Table
-// Availability client is replaced by stubs on the client object itself.
+// Availability client is replaced by stubs on the client object itself (the port bound by wire() delegates to it).
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { tableAvailability } from '../src/clients.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { tableAvailability } from '../src/infrastructure/clients.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
 import type { CreateRoundTableStatusRequest } from '@seats/proto/gen/seats/tableavailability/v1/CreateRoundTableStatusRequest';
+wire();   // the in-memory repositories and the client object behind the domain's ports, once per process
 
 const refused = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const PAST = '2026-01-01T00:00:00.000Z';

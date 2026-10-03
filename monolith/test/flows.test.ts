@@ -5,9 +5,9 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import { wireMonolith } from '../src/wire.js';
-import { resetStore as resetRounds } from '@seats/concert-round/src/store.js';
-import { resetStore as resetTables } from '@seats/table-availability/src/store.js';
-import { resetStore as resetBookings } from '@seats/booking/src/store.js';
+import { resetStore as resetRounds } from '@seats/concert-round/src/infrastructure/index.js';
+import { resetStore as resetTables } from '@seats/table-availability/src/infrastructure/index.js';
+import { resetStore as resetBookings } from '@seats/booking/src/infrastructure/index.js';
 
 await wireMonolith();
 const { createApp } = await import('@seats/gateway/src/app.js');

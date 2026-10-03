@@ -1,13 +1,13 @@
 // UC-07 Set Business Parameters (FR-38): the single settings document of the Round DB, answered with its defaults
 // (BRULE-02, 04, 05, 09) until the Manager sets it; a round snapshots the values in force when it is published.
 import { DomainError } from '@seats/errors/src/index.js';
-import { businessParameters } from '../repository.js';
-import type { BusinessParameters } from '../model.js';
+import { ports } from './ports.js';
+import type { BusinessParameters } from './model.js';
 
 const DEFAULT_PARAMETERS: BusinessParameters = { holdPeriodMinutes: 15, checkInWindowHours: 2, gracePeriodMinutes: 30, extraPersonFee: 600 };   // BRULE-02, 04, 05, 09
 
 export async function getBusinessParameters(): Promise<BusinessParameters> {
-  return (await businessParameters.get()) ?? (await businessParameters.save({ ...DEFAULT_PARAMETERS }));
+  return (await ports.businessParameters.get()) ?? (await ports.businessParameters.save({ ...DEFAULT_PARAMETERS }));
 }
 
 export async function updateBusinessParameters(patch: Partial<BusinessParameters>): Promise<BusinessParameters> {
@@ -18,5 +18,5 @@ export async function updateBusinessParameters(patch: Partial<BusinessParameters
     if (!Number.isFinite(v) || v < 0) throw new DomainError('invalid', `${k} must be a non-negative number`);
     p[k] = v;
   }
-  return businessParameters.save(p);
+  return ports.businessParameters.save(p);
 }

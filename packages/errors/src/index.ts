@@ -65,6 +65,21 @@ export function fromCollaborator(system: string, e: unknown): unknown {
   return e;
 }
 
+/** How a domain reads a collaborator's answer without knowing gRPC: the kind of refusal the collaborator's status
+ *  stands for, or null when the error is not a refusal (a transport failure, a defect). A domain names its own
+ *  message for the refusal it expects (`refusalOf(e) === 'not_found' ? new DomainError('not_found', 'round not found') : e`). */
+export function refusalOf(e: unknown): DomainErrorKind | null {
+  const code = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined;
+  switch (code) {
+    case grpc.status.NOT_FOUND: return 'not_found';
+    case grpc.status.FAILED_PRECONDITION: case grpc.status.ALREADY_EXISTS: case grpc.status.ABORTED: return 'conflict';
+    case grpc.status.INVALID_ARGUMENT: return 'invalid';
+    case grpc.status.UNAUTHENTICATED: return 'unauthenticated';
+    case grpc.status.UNIMPLEMENTED: return 'not_implemented';
+    default: return null;
+  }
+}
+
 export type ErrorLog = (line: string, cause?: unknown) => void;
 
 /** The gRPC status a failure becomes at the API layer of a service; `log` receives the infrastructure failures and

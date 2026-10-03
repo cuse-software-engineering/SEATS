@@ -49,7 +49,7 @@ round, wins the hold in its own store and reports it to the table map; the party
 ## Contracts
 
 The design is contract first, derived in one direction: the domain model of the document → each service's data model
-([docs/data-model.md](docs/data-model.md)) → its types (`src/model.ts`) → its gRPC messages (`proto/*.proto`, types
+([docs/data-model.md](docs/data-model.md)) → its types (`src/domain/model.ts`) → its gRPC messages (`proto/*.proto`, types
 generated into `proto/gen/`) → the routes of the gateway ([docs/openapi.yaml](docs/openapi.yaml), from which the web
 apps generate their client types). [docs/contracts.md](docs/contracts.md) is the readable route table with the gRPC
 method, the roles and the notes behind each route. A contract change is a compile error in every caller, the gateway
@@ -122,19 +122,22 @@ the one to register as the LIFF endpoint later (ADR-01).
 
 ## Inside a service
 
-TypeScript throughout (ES modules, `strict`), the same layout in every service:
+TypeScript throughout (ES modules, `strict`), the same three layers in every service, and one rule between them:
+the domain depends on nothing outside itself, the infrastructure depends on the domain, the API layer on both.
+`npm run typecheck` runs `scripts/check-layers.mjs`, which fails on any import that breaks the rule.
 
-| File | Holds |
+| Folder | Holds |
 |---|---|
-| `src/model.ts` | the types of the service's data model |
-| `src/domain.ts` | the rules: one function per operation of the document's Table 5.3; no transport code. The two larger services keep them in a `src/domain/` folder, one file per use case, behind this barrel |
-| `src/repository.ts` | the service's repositories, one interface per aggregate with domain-named queries (`RoundRepository.publishedOnMap`, `BookingRepository.ofCustomer`, `TableLock.acquire`), implemented over `@seats/store` |
-| `src/store.ts` | the service's database (`@seats/store`, ADR-06): in memory by default, MongoDB through Mongoose when `<SERVICE>_MONGO_URL` or `MONGO_URL` is set |
-| `src/api.ts` | the API layer: one function per gRPC method, request message in, response message out |
-| `src/grpc.ts` | the gRPC server over the API layer, plus `grpc.health.v1.Health` |
-| `src/clients.ts` | the gRPC clients of the services it calls, each call with a deadline |
-| `src/adapters.ts` | the ports to the external systems it uses, with their fakes (where the service has one) |
-| `test/` | unit tests of the domain with the clients stubbed |
+| `src/domain/` | the pure core: `model.ts` (the types of the data model), `repository.ts` (the repository interfaces, one per aggregate, with domain-named queries), `ports.ts` (every interface the rules need from outside, repositories, external systems, collaborator services, and the `ports` holder the rules call), one file per use case (`zone-maps.ts`, `rounds.ts`, `booking.ts`, `expiry.ts`, …), `index.ts` the barrel. Imports only `@seats/errors` and message types |
+| `src/infrastructure/` | the implementations of the ports: `store.ts` (the database, `@seats/store`), `repositories.ts` (the repositories over it), `adapters.ts` (the external systems and their fakes), `clients.ts` (the gRPC clients of the services it calls, each call with a deadline), `index.ts` whose `wire()` binds them to the domain's ports |
+| `src/api/` | `handlers.ts`, one function per gRPC method, request message in, response message out, the domain's failures mapped by `toServiceError`; `grpc.ts`, the gRPC server over the handlers plus `grpc.health.v1.Health` |
+| `src/server.ts` | the composition root: connect the store, `wire()`, seed, start gRPC |
+| `test/` | unit tests of the domain through the in-memory infrastructure, the clients stubbed on the client objects |
+
+The rules reach the outside only through `ports` (`ports.rounds.publishedOnMap(id)`, `ports.mediaStorage.store(…)`,
+`ports.concertRound.getRound(id)`). `wire()` binds the real implementations once at start-up; the monolith calls each
+service's `wire()` and then patches the client objects for in-process calls, and the unit tests call it before stubbing.
+A port read before `wire()` throws a clear error instead of an undefined access.
 
 Every service serves the standard health check; the gateway's `GET /health` calls each of them.
 
@@ -149,7 +152,7 @@ gRPC status to HTTP (400, 401, 404, 409, 501, 502, 504, 500).
 
 **Persistence (ADR-06).** `packages/store` holds the one repository contract, `Collection<T>` with `get`, `put`,
 `insert`, `delete`, `list` and `find`, all asynchronous, every read a copy, and two implementations: in memory, and
-MongoDB through Mongoose. A service binds to it in `src/store.ts` and chooses at start-up: `<SERVICE>_MONGO_URL` names
+MongoDB through Mongoose. A service binds to it in `src/infrastructure/store.ts` and chooses at start-up: `<SERVICE>_MONGO_URL` names
 the service's own database, `MONGO_URL` names a cluster on which the service takes the database `seats_<service>`,
 nothing means memory (development, the tests, the demo deployment). `insert()` fails on an existing id on both stores,
 which is how the Booking Service keeps first-lock-wins on a table (ADR-13). `npm -w packages/store test` runs the
@@ -169,9 +172,9 @@ real implementation replaces the fake by configuration, and the tests inject the
 | Port | Where | Fake (default) | Selected by |
 |---|---|---|---|
 | LINE Login: verify an ID token | `gateway/src/adapters.ts` | accepts `Authorization: Bearer fake-line-<LINE user id>` | `LINE_LOGIN=fake` |
-| LINE Messaging: push a message | `services/notification/src/adapters.ts` | logs the push and records it; a test can make the next pushes fail, which the retry job of FR-22 then retries three times | `LINE_MESSAGING=fake` |
-| Payment Gateway: open a checkout, verify a result's signature | `services/payment/src/adapters.ts` | the simulated gateway of ADR-11: a fake checkout URL, the signature `sim-<payment id>` | `PAYMENT_GATEWAY=simulated` |
-| Media Storage: store the image of a zone map | `services/concert-round/src/adapters.ts` | answers a URL without storing; a test can make the next store fail (UC-04 EF-3) | `MEDIA_STORAGE=fake` |
+| LINE Messaging: push a message | `services/notification/src/infrastructure/adapters.ts` | logs the push and records it; a test can make the next pushes fail, which the retry job of FR-22 then retries three times | `LINE_MESSAGING=fake` |
+| Payment Gateway: open a checkout, verify a result's signature | `services/payment/src/infrastructure/adapters.ts` | the simulated gateway of ADR-11: a fake checkout URL, the signature `sim-<payment id>` | `PAYMENT_GATEWAY=simulated` |
+| Media Storage: store the image of a zone map | `services/concert-round/src/infrastructure/adapters.ts` | answers a URL without storing; a test can make the next store fail (UC-04 EF-3) | `MEDIA_STORAGE=fake` |
 
 The gateway therefore accepts two identities: the progress-1 headers `x-user-id` and `x-role` (staff, and the web
 apps for now) or a LINE ID token as `Authorization: Bearer …`, verified by the LINE Login Adapter, which makes the
@@ -183,7 +186,7 @@ caller a customer.
   `owner`); the LIFF app will send the LINE ID token instead. Staff can already sign in at the Staff Account Service
   (`POST /api/sessions`), which seeds `manager/manager`, `door1/door1` and `owner/owner`; the staff routes do not check
   the session token yet.
-- **Storage**: every service keeps its data in memory behind `src/store.ts`.
+- **Storage**: every service keeps its data in memory behind `src/infrastructure/store.ts` unless `MONGO_URL` is set.
 - **Payment**: the Booking Service's `startPayment()` still answers 501; wiring it to the Payment Service comes in
   progress 2. The simulated gateway's result is posted to `POST /api/payments/webhook`.
 - **Notifications**: the Booking Service does not call the Notification Service yet.

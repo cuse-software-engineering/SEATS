@@ -1,14 +1,17 @@
 // Unit tests of the Booking Service domain: the hold, the fee, cancel and the expiry job (UC-01, ADR-13). The Concert
-// Round and Table Availability clients are replaced by stubs on the client objects themselves.
+// Round and Table Availability clients are replaced by stubs on the client objects themselves (the ports delegate to
+// the current method, so a stub set after wire() is followed).
 import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as d from '../src/domain.js';
-import { concertRound, tableAvailability, GRPC_STATUS } from '../src/clients.js';
-import { resetStore } from '../src/store.js';
+import * as d from '../src/domain/index.js';
+import { concertRound, tableAvailability, GRPC_STATUS } from '../src/infrastructure/clients.js';
+import { resetStore, wire } from '../src/infrastructure/index.js';
 import type { Round__Output } from '@seats/proto/gen/seats/concertround/v1/Round';
 import type { TableRef } from '@seats/proto/gen/seats/tableavailability/v1/TableRef';
 import type { HoldTableRequest } from '@seats/proto/gen/seats/tableavailability/v1/HoldTableRequest';
 import type { TableStatus__Output } from '@seats/proto/gen/seats/tableavailability/v1/TableStatus';
+
+wire();   // binds the in-memory repositories and the client objects to the domain's ports
 
 const rejected = (p: Promise<unknown>, kind: d.DomainError['kind']) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.kind === kind);
 const SOMCHAI = 'U-somchai', MALEE = 'U-malee';
