@@ -107,9 +107,10 @@ GATEWAY=https://seats-monolith.onrender.com npm run smoke   # table types, a zon
 `/health` as the health check. Its URL is `https://seats-monolith.onrender.com`; if Render has to change the name, put
 the new host into the two `vercel.json` files below. The free plan sleeps after 15 minutes without traffic (the first
 request then takes up to a minute) and keeps the data in memory, so it starts empty after every sleep: seed it with
-`GATEWAY=https://seats-monolith.onrender.com npm run smoke` or through the back-office. The Round DB can instead
-persist to MongoDB: set `CONCERT_ROUND_MONGO_URL` on the Render service (e.g. an Atlas free-tier connection string)
-and zone maps, table types, rounds and business parameters survive a sleep; see `services/concert-round/README.md`.
+`GATEWAY=https://seats-monolith.onrender.com npm run smoke` or through the back-office. The databases can instead
+persist to MongoDB: set `MONGO_URL` on the Render service (e.g. an Atlas free-tier connection string; each service takes
+its own database `seats_<service>` on it, or `<SERVICE>_MONGO_URL` per service) and everything survives a sleep; see
+`packages/store/` and "Inside a service" below.
 
 **Web apps on Vercel** (Hobby plan): import this repository twice, once with the root directory
 `frontend/customer-web-app` and once with `frontend/back-office-web-app`. Each folder's `vercel.json` sets the
@@ -127,7 +128,7 @@ TypeScript throughout (ES modules, `strict`), the same layout in every service:
 |---|---|
 | `src/model.ts` | the types of the service's data model |
 | `src/domain.ts` | the rules: one function per operation of the document's Table 5.3; no transport code |
-| `src/store.ts` | the in-memory store behind the domain (to be swapped for Mongoose, ADR-06 — done for `services/concert-round`, the others still in memory) |
+| `src/store.ts` | the service's database as a repository (`@seats/store`, ADR-06): in memory by default, MongoDB through Mongoose when `<SERVICE>_MONGO_URL` or `MONGO_URL` is set |
 | `src/api.ts` | the API layer: one function per gRPC method, request message in, response message out |
 | `src/grpc.ts` | the gRPC server over the API layer, plus `grpc.health.v1.Health` |
 | `src/clients.ts` | the gRPC clients of the services it calls, each call with a deadline |
@@ -135,6 +136,19 @@ TypeScript throughout (ES modules, `strict`), the same layout in every service:
 | `test/` | unit tests of the domain with the clients stubbed |
 
 Every service serves the standard health check; the gateway's `GET /health` calls each of them.
+
+**Persistence (ADR-06).** `packages/store` holds the one repository contract, `Collection<T>` with `get`, `put`,
+`insert`, `delete`, `list` and `find`, all asynchronous, every read a copy, and two implementations: in memory, and
+MongoDB through Mongoose. A service binds to it in `src/store.ts` and chooses at start-up: `<SERVICE>_MONGO_URL` names
+the service's own database, `MONGO_URL` names a cluster on which the service takes the database `seats_<service>`,
+nothing means memory (development, the tests, the demo deployment). `insert()` fails on an existing id on both stores,
+which is how the Booking Service keeps first-lock-wins on a table (ADR-13). `npm -w packages/store test` runs the
+contract against memory, and against MongoDB too when `TEST_MONGO_URL` is set. The whole system on a local MongoDB:
+
+```bash
+docker run -d -p 27017:27017 mongo:7
+MONGO_URL=mongodb://localhost:27017 npm run dev:mono     # six databases seats_* on it; data survives a restart
+```
 
 ## External systems: adapters and their fakes
 

@@ -19,13 +19,13 @@ export const inProcessOnly = (why: string) => ({ skip: EXTERNAL ? `in-process on
 let url = GATEWAY;
 if (!EXTERNAL) {
   const { wireMonolith } = await import('../../src/wire.js');
-  wireMonolith();                                                   // before the route table binds the client methods
+  await wireMonolith();                                             // before the route table binds the client methods
   const { createApp } = await import('@seats/gateway/src/app.js');
   const server = createApp().listen(0);
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const stores = await Promise.all([import('@seats/concert-round/src/store.js'), import('@seats/table-availability/src/store.js'), import('@seats/booking/src/store.js')]);
   after(() => server.close());
-  before(() => { for (const s of stores) s.resetStore(); });
+  before(async () => { for (const s of stores) await s.resetStore(); });
 }
 export const G = () => url;
 

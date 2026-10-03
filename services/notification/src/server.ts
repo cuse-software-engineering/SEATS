@@ -1,5 +1,8 @@
+import { connectStore } from './store.js';
 import { startGrpc } from './grpc.js';
 import { retryFailedMessages } from './domain.js';
+
+await connectStore();   // the Notification DB (ADR-06): MongoDB with NOTIFICATION_MONGO_URL or MONGO_URL, else in memory
 
 const RETRY_JOB_MS = Number(process.env.NOTIFICATION_RETRY_MS ?? 100_000);   // FR-22: three retries within five minutes
 

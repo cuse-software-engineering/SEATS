@@ -1,9 +1,10 @@
 {
   "name": "seats",
   "private": true,
-  "description": "SEATS \u2014 Seating & Event Availability Tracking System. Microservices of the 2110521 group project (SE 101).",
+  "description": "SEATS — Seating & Event Availability Tracking System. Microservices of the 2110521 group project (SE 101).",
   "workspaces": [
     "proto",
+    "packages/*",
     "gateway",
     "monolith",
     "services/*",

@@ -13,7 +13,7 @@ const messages = collection<Message>('messages');
 let line: LoggingLineMessaging;
 const quiet = <T>(fn: () => Promise<T>): Promise<T> => { const log = console.log, warn = console.warn; console.log = () => {}; console.warn = () => {}; return fn().finally(() => { console.log = log; console.warn = warn; }); };
 
-beforeEach(() => { resetStore(); line = new LoggingLineMessaging(); adapters.lineMessaging = line; });
+beforeEach(async () => { await resetStore(); line = new LoggingLineMessaging(); adapters.lineMessaging = line; });
 
 describe('the three notices', () => {
   test('each pushes one message through the adapter, records it and answers delivered', () => quiet(async () => {
@@ -21,7 +21,7 @@ describe('the three notices', () => {
     for (const [kind, send] of senders) {
       const r = await send(REQUEST);
       assert.equal(r.delivered, true);
-      const m = messages.get(r.messageId);
+      const m = await messages.get(r.messageId);
       assert.deepEqual([m?.kind, m?.customerId, m?.bookingId, m?.attempts, m?.lastError], [kind, 'U-somchai', 'b1', 1, '']);
       assert.ok(m?.text.includes('table 5') && m.text.includes('Friday Live'), m?.text);
     }
@@ -30,7 +30,7 @@ describe('the three notices', () => {
   test('a notice needs the customer and the booking', () => quiet(async () => {
     await rejected(d.sendBookingConfirmation({ ...REQUEST, customerId: '' }), 400);
     await rejected(d.sendHoldExpiredNotice({ ...REQUEST, bookingId: undefined }), 400);
-    assert.deepEqual([line.pushed, messages.list()], [[], []]);
+    assert.deepEqual([line.pushed, await messages.list()], [[], []]);
   }));
 });
 
@@ -39,15 +39,15 @@ describe('when the LINE Messaging API refuses the message (UC-01 EF-3, FR-22)', 
     line.failNext = 1;
     const r = await d.sendBookingConfirmation(REQUEST);
     assert.equal(r.delivered, false);
-    const m = d.getMessage(r.messageId);
+    const m = await d.getMessage(r.messageId);
     assert.equal(m?.attempts, 1); assert.match(m?.lastError ?? '', /did not accept/);
   }));
   test('the retry job resends it and stops once delivered', () => quiet(async () => {
     line.failNext = 1;
     const r = await d.sendHoldExpiredNotice(REQUEST);
     assert.deepEqual(await d.retryFailedMessages(), [r.messageId]);
-    assert.equal(d.getMessage(r.messageId)?.delivered, true);
-    assert.equal(d.getMessage(r.messageId)?.attempts, 2);
+    const m = await d.getMessage(r.messageId);
+    assert.equal(m?.delivered, true); assert.equal(m?.attempts, 2);
     assert.deepEqual(await d.retryFailedMessages(), [], 'nothing left to retry');
   }));
   test('the retry job gives up after three attempts', () => quiet(async () => {
@@ -55,7 +55,8 @@ describe('when the LINE Messaging API refuses the message (UC-01 EF-3, FR-22)', 
     const r = await d.sendPaymentFailedNotice(REQUEST);
     await d.retryFailedMessages(); await d.retryFailedMessages();
     assert.deepEqual(await d.retryFailedMessages(), [], 'the fourth push is never tried');
-    assert.deepEqual([d.getMessage(r.messageId)?.delivered, d.getMessage(r.messageId)?.attempts], [false, 3]);
+    const m = await d.getMessage(r.messageId);
+    assert.deepEqual([m?.delivered, m?.attempts], [false, 3]);
     assert.equal(line.pushed.length, 0);
   }));
 });

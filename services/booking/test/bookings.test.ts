@@ -10,7 +10,6 @@ import type { TableRef } from '@seats/proto/gen/seats/tableavailability/v1/Table
 import type { HoldTableRequest } from '@seats/proto/gen/seats/tableavailability/v1/HoldTableRequest';
 import type { TableStatus__Output } from '@seats/proto/gen/seats/tableavailability/v1/TableStatus';
 
-const refused = (fn: () => unknown, status: number) => assert.throws(fn, (e: unknown) => e instanceof d.DomainError && e.status === status);
 const rejected = (p: Promise<unknown>, status: number) => assert.rejects(p, (e: unknown) => e instanceof d.DomainError && e.status === status);
 const SOMCHAI = 'U-somchai', MALEE = 'U-malee';
 const PAST = '2026-01-01T00:00:00.000Z';
@@ -23,8 +22,8 @@ const asTable = (req: TableRef | HoldTableRequest, status: string): TableStatus_
 let holds: HoldTableRequest[] = [];
 let releases: TableRef[] = [];
 
-beforeEach(() => {
-  resetStore();
+beforeEach(async () => {
+  await resetStore();
   holds = [];
   releases = [];
   concertRound.getRound = async () => round();
@@ -42,13 +41,13 @@ describe('createHeldBooking', () => {
     assert.deepEqual(b.history.map((h) => [h.status, h.by]), [['Held', SOMCHAI]]);
     assert.deepEqual([b.zoneId, b.zoneName, b.tableTypeId, b.capacity, b.partySize, b.fee, b.termsAccepted], ['A', 'Zone A', 'sofa6', 6, null, null, false]);
     assert.deepEqual(holds, [{ roundId: 'r1', tableNumber: 1, bookingId: b.id, holdEndsAt: b.holdEndsAt }]);
-    assert.equal(d.getBooking(b.id, SOMCHAI).id, b.id);
+    assert.equal((await d.getBooking(b.id, SOMCHAI)).id, b.id);
   });
   test('a second hold on the same table by another customer is refused: the first lock wins', async () => {
     await d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 });
     await rejected(d.createHeldBooking(MALEE, { roundId: 'r1', tableNumber: 1 }), 409);
     assert.equal(holds.length, 1);
-    assert.equal(d.getCustomerBookings(MALEE).length, 0);
+    assert.equal((await d.getCustomerBookings(MALEE)).length, 0);
     await d.createHeldBooking(MALEE, { roundId: 'r1', tableNumber: 2 });                      // another table is fine
     assert.equal(holds.length, 2);
   });
@@ -69,7 +68,7 @@ describe('createHeldBooking', () => {
   test('when the read model refuses the hold the booking is dropped', async () => {
     tableAvailability.holdTable = async () => { throw Object.assign(new Error('HELD'), { code: GRPC_STATUS.FAILED_PRECONDITION }); };
     await rejected(d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 }), 409);
-    assert.deepEqual(d.getCustomerBookings(SOMCHAI), []);
+    assert.deepEqual(await d.getCustomerBookings(SOMCHAI), []);
   });
 });
 
@@ -94,10 +93,10 @@ describe('setPartySize', () => {
 describe('getBooking', () => {
   test('another customer gets 404, not 403 (FR-40)', async () => {
     const b = await d.createHeldBooking(SOMCHAI, { roundId: 'r1', tableNumber: 1 });
-    refused(() => d.getBooking(b.id, MALEE), 404);
-    refused(() => d.getBooking('nope', SOMCHAI), 404);
-    assert.deepEqual(d.getCustomerBookings(SOMCHAI).map((x) => x.id), [b.id]);
-    assert.deepEqual(d.getRoundBookings('r1').map((x) => x.id), [b.id]);
+    await rejected(d.getBooking(b.id, MALEE), 404);
+    await rejected(d.getBooking('nope', SOMCHAI), 404);
+    assert.deepEqual((await d.getCustomerBookings(SOMCHAI)).map((x) => x.id), [b.id]);
+    assert.deepEqual((await d.getRoundBookings('r1')).map((x) => x.id), [b.id]);
   });
 });
 
@@ -107,10 +106,10 @@ describe('terms and payment', () => {
     const terms = await d.getBookingTerms(b.id, SOMCHAI);
     assert.equal(terms.checkInWindow.graceEndsAt, '2026-12-24T20:30:00.000Z');
     assert.equal(terms.terms.length, 4);
-    refused(() => d.startPayment(b.id, SOMCHAI), 409);                                          // no fee, no accepted terms yet
-    assert.equal(d.acceptBookingTerms(b.id, SOMCHAI).termsAccepted, true);
+    await rejected(d.startPayment(b.id, SOMCHAI), 409);                                         // no fee, no accepted terms yet
+    assert.equal((await d.acceptBookingTerms(b.id, SOMCHAI)).termsAccepted, true);
     await d.setPartySize(b.id, SOMCHAI, { partySize: 2 });
-    refused(() => d.startPayment(b.id, SOMCHAI), 501);
+    await rejected(d.startPayment(b.id, SOMCHAI), 501);
   });
 });
 
@@ -140,10 +139,10 @@ describe('expireUnpaidBookings', () => {
       assert.deepEqual(await d.expireUnpaidBookings(Date.now() + 20 * 60e3), [overdue.id]);
       assert.deepEqual(await d.expireUnpaidBookings(Date.now() + 20 * 60e3), []);              // nothing left to expire
     } finally { console.log = log; }
-    const e = d.getBooking(overdue.id, SOMCHAI);
+    const e = await d.getBooking(overdue.id, SOMCHAI);
     assert.equal(e.status, 'Expired');
     assert.deepEqual(e.history.map((h) => [h.status, h.by]), [['Held', SOMCHAI], ['Expired', 'hold-expiry job']]);
-    assert.equal(d.getBooking(later.id, MALEE).status, 'Held');
+    assert.equal((await d.getBooking(later.id, MALEE)).status, 'Held');
     assert.deepEqual(releases, [{ roundId: 'r1', tableNumber: 1, bookingId: overdue.id }]);
   });
 });

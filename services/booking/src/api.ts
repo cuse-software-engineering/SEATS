@@ -35,19 +35,19 @@ const toBooking = (b: Booking | BookingView): BookingMessage =>
 
 export const api: ApiOf<BookingsHandlers> = {
   CreateHeldBooking: async ({ roundId, tableNumber }, ctx) => toBooking(await d.createHeldBooking(caller(ctx), { roundId, tableNumber })),
-  GetBooking: ({ bookingId }, ctx) => toBooking(d.getBooking(bookingId, caller(ctx))),
+  GetBooking: async ({ bookingId }, ctx) => toBooking(await d.getBooking(bookingId, caller(ctx))),
   SetPartySize: async ({ bookingId, partySize }, ctx) => toBooking(await d.setPartySize(bookingId, caller(ctx), { partySize })),
   GetCustomerProfile: (_req, ctx) => d.getCustomerProfile(caller(ctx)),
   CreateCustomerProfile: (profile, ctx) => d.createCustomerProfile(caller(ctx), profile),
   UpdateCustomerProfile: ({ name, phone }, ctx) => d.updateCustomerProfile(caller(ctx), { name, phone }),
   GetBookingTerms: ({ bookingId }, ctx) => d.getBookingTerms(bookingId, caller(ctx)),
-  AcceptBookingTerms: ({ bookingId }, ctx) => toBooking(d.acceptBookingTerms(bookingId, caller(ctx))),
+  AcceptBookingTerms: async ({ bookingId }, ctx) => toBooking(await d.acceptBookingTerms(bookingId, caller(ctx))),
   StartPayment: ({ bookingId }, ctx) => d.startPayment(bookingId, caller(ctx)),
   CancelBooking: async ({ bookingId }, ctx) => toBooking(await d.cancelBooking(bookingId, caller(ctx))),
-  GetCustomerBookings: (_req, ctx) => ({ bookings: d.getCustomerBookings(caller(ctx)).map(toBooking) }),
+  GetCustomerBookings: async (_req, ctx) => ({ bookings: (await d.getCustomerBookings(caller(ctx))).map(toBooking) }),
   GetETicket: () => d.getETicket(),
   VerifyBookingReference: () => d.verifyBookingReference(),
   CheckInBooking: () => d.checkInBooking(),
-  GetRoundBookings: ({ roundId }) => ({ bookings: d.getRoundBookings(roundId).map(toBooking) }),
+  GetRoundBookings: async ({ roundId }) => ({ bookings: (await d.getRoundBookings(roundId)).map(toBooking) }),
   ConfirmBookingPayment: () => { throw new d.DomainError(501, 'confirmBookingPayment() is built with the Payment Service in progress 2'); },
 };

@@ -1,10 +1,16 @@
 // One process for development (ADR-14): `npm run dev:mono`. The gateway's REST API on :4000, the six services behind
 // it in memory. Not a deployment target: the MVP is deployed as the seven processes of docker-compose.yml.
-import { connectStore as connectRoundStore } from '@seats/concert-round/src/store.js';
+import { connectStore as connectRounds } from '@seats/concert-round/src/store.js';
+import { connectStore as connectTables } from '@seats/table-availability/src/store.js';
+import { connectStore as connectBookings } from '@seats/booking/src/store.js';
+import { connectStore as connectPayments } from '@seats/payment/src/store.js';
+import { connectStore as connectNotifications } from '@seats/notification/src/store.js';
+import { connectStore as connectStaff } from '@seats/staff-account/src/store.js';
 import { startJobs, wireMonolith } from './wire.js';
 
-await connectRoundStore();   // the Round DB (ADR-06): hydrates from MongoDB when CONCERT_ROUND_MONGO_URL is set, else stays in memory as before
-wireMonolith();
+// the six databases (ADR-06, one per service): MongoDB where <SERVICE>_MONGO_URL or MONGO_URL says so, else in memory
+await Promise.all([connectRounds(), connectTables(), connectBookings(), connectPayments(), connectNotifications(), connectStaff()]);
+await wireMonolith();
 startJobs();
 const { createApp } = await import('@seats/gateway/src/app.js');   // after the wiring: the route table binds the client methods when it loads
 const PORT = Number(process.env.PORT ?? 4000);

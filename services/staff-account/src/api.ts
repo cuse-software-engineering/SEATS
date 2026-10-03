@@ -1,5 +1,6 @@
 // The API layer of the Staff Account Service: one function per method of staff_account.proto, from the request message to the
 // response message (ADR-14). grpc.ts wraps it as the gRPC server; the monolith mode calls it in-process. A refused sign-in is UNAUTHENTICATED (401 at the gateway).
+// The domain is asynchronous (its store is): every handler answers a Promise, which grpc.ts and the monolith await.
 import grpc from '@grpc/grpc-js';
 import type { ApiOf } from '@seats/proto/api';
 import type { StaffAccountsHandlers } from '@seats/proto/gen/seats/staffaccount/v1/StaffAccounts';
@@ -19,10 +20,10 @@ export function toServiceError(e: unknown): grpc.ServiceError {
 }
 
 export const api: ApiOf<StaffAccountsHandlers> = {
-  SignIn: (req) => domain.signIn(req),
-  SignOut: (req) => domain.signOut(req),
-  CreateStaffAccount: (req) => domain.createStaffAccount(req),
-  ListStaffAccounts: () => ({ accounts: domain.listStaffAccounts() }),
-  UpdateStaffAccount: (req) => domain.updateStaffAccount(req),
-  DisableStaffAccount: (req) => domain.disableStaffAccount(req),
+  SignIn: async (req) => domain.signIn(req),
+  SignOut: async (req) => domain.signOut(req),
+  CreateStaffAccount: async (req) => domain.createStaffAccount(req),
+  ListStaffAccounts: async () => ({ accounts: await domain.listStaffAccounts() }),
+  UpdateStaffAccount: async (req) => domain.updateStaffAccount(req),
+  DisableStaffAccount: async (req) => domain.disableStaffAccount(req),
 };

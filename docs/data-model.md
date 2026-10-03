@@ -201,7 +201,7 @@ erDiagram
     }
 ```
 
-Sessions are in memory in progress 1 (ADR-07); disabling an account ends its sessions.
+Sessions live in the Staff Account DB next to the accounts, in memory unless the service is configured for MongoDB (ADR-06, ADR-07); disabling an account ends its sessions.
 
 ## Not modelled yet
 

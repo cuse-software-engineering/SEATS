@@ -4,7 +4,19 @@
   "private": true,
   "type": "module",
   "description": "Table Availability Service: the read model of the table map, per-round table status (gRPC :5003, ADR-13).",
-  "scripts": { "dev": "tsx src/server.ts", "build": "tsc -p .", "typecheck": "tsc -p . --noEmit", "test": "node --import tsx --test test/*.test.ts", "start": "node dist/server.js" },
-  "dependencies": { "@grpc/grpc-js": "^1.12.0", "@grpc/proto-loader": "^0.7.13" },
-  "devDependencies": { "@seats/proto": "*" }
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.0",
+    "@grpc/proto-loader": "^0.7.13",
+    "@seats/store": "*"
+  },
+  "devDependencies": {
+    "@seats/proto": "*"
+  }
 }

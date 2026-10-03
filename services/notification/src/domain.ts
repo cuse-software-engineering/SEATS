@@ -52,7 +52,7 @@ export const sendPaymentFailedNotice = (req: NotificationRequest): Promise<Notif
 /** The retry job (Table 5.3, FR-22, UC-01 EF-3): not an operation; the service runs it on its own timer. */
 export async function retryFailedMessages(): Promise<string[]> {
   const retried: string[] = [];
-  for (const m of messages.list().filter((x) => !x.delivered && x.attempts < MAX_ATTEMPTS)) {
+  for (const m of (await messages.find({ delivered: false })).filter((x) => x.attempts < MAX_ATTEMPTS)) {
     await attempt(m);
     retried.push(m.messageId);
   }
@@ -60,4 +60,4 @@ export async function retryFailedMessages(): Promise<string[]> {
 }
 
 /** For the tests and the live view of a message. */
-export const getMessage = (messageId: string): Message | null => messages.get(messageId);
+export const getMessage = (messageId: string): Promise<Message | null> => messages.get(messageId);

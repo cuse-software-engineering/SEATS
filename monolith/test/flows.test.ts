@@ -9,12 +9,12 @@ import { resetStore as resetRounds } from '@seats/concert-round/src/store.js';
 import { resetStore as resetTables } from '@seats/table-availability/src/store.js';
 import { resetStore as resetBookings } from '@seats/booking/src/store.js';
 
-wireMonolith();
+await wireMonolith();
 const { createApp } = await import('@seats/gateway/src/app.js');
 const server = createApp().listen(0);
 const G = () => `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 after(() => server.close());
-before(() => { resetRounds(); resetTables(); resetBookings(); });
+before(async () => { await resetRounds(); await resetTables(); await resetBookings(); });
 
 type Headers = Record<string, string>;
 const H = (userId: string, role: string): Headers => ({ 'x-user-id': userId, 'x-role': role, 'content-type': 'application/json' });

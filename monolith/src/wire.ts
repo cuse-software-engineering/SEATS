@@ -16,7 +16,7 @@ import { retryFailedMessages } from '@seats/notification/src/domain.js';
 import { inProcess, serviceDefinition } from './inprocess.js';
 
 /** Rewires every client to in-process calls. Call it before the gateway's route table loads (it binds the client methods). */
-export function wireMonolith(): void {
+export async function wireMonolith(): Promise<void> {
   const round = inProcess(serviceDefinition('concert_round.proto', 'seats', 'concertround', 'v1', 'ConcertRound'), roundApi, roundError);
   const tables = inProcess(serviceDefinition('table_availability.proto', 'seats', 'tableavailability', 'v1', 'TableAvailability'), tableApi, tableError);
   const bookings = inProcess(serviceDefinition('booking.proto', 'seats', 'booking', 'v1', 'Bookings'), bookingApi, bookingError);
@@ -52,7 +52,7 @@ export function wireMonolith(): void {
     countAvailableTables: (roundIds: string[]) => tables.promise.CountAvailableTables({ roundIds }),
     removeRoundTableStatus: (roundId: string) => tables.promise.RemoveRoundTableStatus({ roundId }),
   });
-  seedStaffAccounts();
+  await seedStaffAccounts();
 }
 
 /** The jobs the service processes run on their own timers: the hold expiry of the Booking Service (ADR-08) and the retry of the Notification Service (FR-22). */
