@@ -5,9 +5,11 @@ import type { TableRef } from '@seats/proto/gen/seats/tableavailability/v1/Table
 import { bindPorts } from '../domain/ports.js';
 import { bookings, profiles, tableLock } from './repositories.js';
 import * as clients from './clients.js';
+import { events } from './broker.js';
 
 export { connectStore, disconnectStore, resetStore, store } from './store.js';
 export * as clients from './clients.js';
+export { connectBroker, disconnectBroker } from './broker.js';
 
 /** Binds the repositories and the gRPC clients to the domain's ports. The client ports delegate call by call to the
  *  current method of the client objects, so the monolith's in-process patching and the tests' stubs on those objects
@@ -27,6 +29,9 @@ export function wire(): void {
       releaseHold: (req: TableRef) => clients.tableAvailability.releaseHold(req),
       markTableBooked: (req: TableRef) => clients.tableAvailability.markTableBooked(req),
       markTableOccupied: (req: TableRef) => clients.tableAvailability.markTableOccupied(req),
+    },
+    events: {
+      holdExpired: (event) => events.holdExpired(event),
     },
   });
 }

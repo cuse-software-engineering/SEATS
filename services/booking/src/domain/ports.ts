@@ -23,12 +23,28 @@ export interface TableAvailabilityClient {
   markTableOccupied(req: TableRef): Promise<TableStatus__Output>;
 }
 
+/** The event a hold's expiry publishes (UC-01 EF-1, ADR-08); infrastructure/broker.ts carries it on the message
+ *  broker to the Notification Service. The job does not wait on it: a failure to publish is a warning, not a reason
+ *  to leave the booking Held. */
+export interface HoldExpiredEvent {
+  bookingId: string;
+  customerId: string;
+  roundId: string;
+  roundName: string;
+  tableNumber: number;
+}
+
+export interface BookingEvents {
+  holdExpired(event: HoldExpiredEvent): Promise<void>;
+}
+
 export interface Ports {
   bookings: BookingRepository;
   profiles: CustomerProfileRepository;
   tableLock: TableLock;
   concertRound: ConcertRoundClient;
   tableAvailability: TableAvailabilityClient;
+  events: BookingEvents;
 }
 
 /** Bound by wire(); reading a port before that throws a clear error instead of an undefined access. */

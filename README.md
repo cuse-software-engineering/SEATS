@@ -190,6 +190,20 @@ docker run -d -p 27017:27017 mongo:7
 MONGO_URL=mongodb://localhost:27017 npm run dev:mono     # six databases seats_* on it; data survives a restart
 ```
 
+**Messaging.** `packages/messaging` holds the one broker contract, `Broker` (`publish`, `consume`), with two
+implementations: in process (one instance a Node process shares, since the broker is one bus every service connects
+to, unlike a database per service) and RabbitMQ through amqplib. A service binds to it in `src/infrastructure/broker.ts` and
+chooses at start-up: `RABBITMQ_URL` names the broker, nothing means in process (development, the tests, the monolith).
+The Booking Service's hold-expiry job (UC-01 EF-1, ADR-08) publishes a `HoldExpiredEvent` to `booking.hold-expired`
+instead of waiting on the Notification Service; the Notification Service consumes it (`src/api/consumer.ts`) and sends
+the same HoldExpiredNotice `SendHoldExpiredNotice` would. `npm -w packages/messaging test` runs the contract against the
+in-process broker, and against RabbitMQ too when `TEST_RABBITMQ_URL` is set. The whole system with RabbitMQ:
+
+```bash
+docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+RABBITMQ_URL=amqp://localhost:5672 npm run dev:mono   # the management UI at http://localhost:15672 (guest/guest)
+```
+
 ## External systems: adapters and their fakes
 
 The LINE Platform, the Payment Gateway and the object storage are reached only through an adapter, a module of the
@@ -216,5 +230,6 @@ caller a customer.
 - **Storage**: every service keeps its data in memory behind `src/infrastructure/store.ts` unless `MONGO_URL` is set.
 - **Payment**: the Booking Service's `startPayment()` still answers 501; wiring it to the Payment Service comes in
   progress 2. The simulated gateway's result is posted to `POST /api/payments/webhook`.
-- **Notifications**: the Booking Service does not call the Notification Service yet.
+- **Notifications**: the hold-expiry notice travels over the message broker (above); a booking confirmation and a
+  payment-failed notice still wait on progress 2 (the Payment Service).
 - **Not built yet**: check-in (501).

@@ -10,7 +10,9 @@ export async function expireUnpaidBookings(now = Date.now()): Promise<string[]> 
     await ports.tableLock.release(b.roundId, b.tableNumber, b.id);                                 // the table is no longer occupied by this booking
     await ports.tableAvailability.releaseHold({ roundId: b.roundId, tableNumber: b.tableNumber, bookingId: b.id })
       .catch((e: Error) => console.warn(`[booking] releaseHold retry later: ${e.message}`));
-    console.log(`[booking] hold expired for booking ${b.id}; Notification Service sendHoldExpiredNotice() comes in progress 2`);
+    const round = await ports.concertRound.getRound(b.roundId);
+    await ports.events.holdExpired({ bookingId: b.id, customerId: b.customerId, roundId: b.roundId, roundName: round.name, tableNumber: b.tableNumber })
+      .catch((e: Error) => console.warn(`[booking] holdExpired publish retry later: ${e.message}`));
     expired.push(b.id);
   }
   return expired;
