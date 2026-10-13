@@ -1,0 +1,32 @@
+{
+  "name": "@seats/messaging",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./src/index.js": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "description": "The message broker a service's domain events travel on...",
+  "scripts": {
+    "test": "node --import tsx --test 'test/*.test.ts'",
+    "typecheck": "tsc -p . --noEmit",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@seats/errors": "*",
+    "amqplib": "^0.10.4"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.5"
+  }
+  
+}

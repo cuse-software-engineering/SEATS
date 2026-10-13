@@ -1,7 +1,15 @@
+# Local deployment of the MVP services (Deliverable 3). `docker compose up --build`, then demo/rest-demo.sh.
+# Ports: gateway REST 4000 (the only REST API, ADR-12); gRPC: concert-round 5001, booking 5002, table-availability 5003,
+# payment 5004, notification 5005, staff-account 5006; the message broker, RabbitMQ, 5672 (management UI 15672).
+
 services:
   gateway:
-    build: { context: ., args: { SERVICE: gateway } }
-    ports: ["4000:4000"]
+    build:
+      context: .
+      args:
+        SERVICE: gateway
+    ports:
+      - "4000:4000"
     environment:
       CONCERT_ROUND_GRPC: concert-round:5001
       BOOKING_GRPC: booking:5002
@@ -10,46 +18,96 @@ services:
       NOTIFICATION_GRPC: notification:5005
       STAFF_ACCOUNT_GRPC: staff-account:5006
       JWT_SECRET: ${JWT_SECRET:-seats_super_secret_key_2026_dev_mode_987654321}
-    depends_on: [concert-round, booking, table-availability, payment, notification, staff-account]
+    depends_on:
+      - concert-round
+      - booking
+      - table-availability
+      - payment
+      - notification
+      - staff-account
 
   concert-round:
-    build: { context: ., args: { SERVICE: services/concert-round } }
-    ports: ["5001:5001"]
+    build:
+      context: .
+      args:
+        SERVICE: services/concert-round
+    ports:
+      - "5001:5001"
     environment:
       TABLE_AVAILABILITY_GRPC: table-availability:5003
       CONCERT_ROUND_MONGO_URL: ${CONCERT_ROUND_MONGO_URL}
+    depends_on:
+      - table-availability
 
   table-availability:
-    build: { context: ., args: { SERVICE: services/table-availability } }
-    ports: ["5003:5003"]
+    build:
+      context: .
+      args:
+        SERVICE: services/table-availability
+    ports:
+      - "5003:5003"
     environment:
       TABLE_AVAILABILITY_MONGO_URL: ${TABLE_AVAILABILITY_MONGO_URL}
 
   booking:
-    build: { context: ., args: { SERVICE: services/booking } }
-    ports: ["5002:5002"]
+    build:
+      context: .
+      args:
+        SERVICE: services/booking
+    ports:
+      - "5002:5002"
     environment:
       CONCERT_ROUND_GRPC: concert-round:5001
       TABLE_AVAILABILITY_GRPC: table-availability:5003
       BOOKING_POSTGRES_URL: postgresql://seats_admin:seats_password123@postgres-db:5432/seats_booking
-    depends_on: [postgres-db]
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      concert-round:
+        condition: service_started
+      table-availability:
+        condition: service_started
+    restart: on-failure
 
   payment:
-    build: { context: ., args: { SERVICE: services/payment } }
-    ports: ["5004:5004"]
+    build:
+      context: .
+      args:
+        SERVICE: services/payment
+    ports:
+      - "5004:5004"
     environment:
       PAYMENT_POSTGRES_URL: postgresql://seats_admin:seats_password123@postgres-db:5432/seats_payment
-    depends_on: [postgres-db]
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    restart: on-failure
 
   notification:
-    build: { context: ., args: { SERVICE: services/notification } }
-    ports: ["5005:5005"]
+    build:
+      context: .
+      args:
+        SERVICE: services/notification
+    ports:
+      - "5005:5005"
     environment:
       NOTIFICATION_MONGO_URL: ${NOTIFICATION_MONGO_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://rabbitmq:5672}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
 
   staff-account:
-    build: { context: ., args: { SERVICE: services/staff-account } }
-    ports: ["5006:5006"]
+    build:
+      context: .
+      args:
+        SERVICE: services/staff-account
+    ports:
+      - "5006:5006"
     environment:
       STAFF_ACCOUNT_MONGO_URL: ${STAFF_ACCOUNT_MONGO_URL}
 
@@ -64,6 +122,24 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seats_admin -d seats_booking"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
 volumes:
   postgres-data: {}

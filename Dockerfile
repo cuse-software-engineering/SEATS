@@ -9,6 +9,7 @@ COPY proto/package.json proto/
 COPY packages/config/package.json packages/config/
 COPY packages/errors/package.json packages/errors/
 COPY packages/store/package.json packages/store/
+COPY packages/messaging/package.json packages/messaging/
 COPY gateway/package.json gateway/
 COPY monolith/package.json monolith/
 COPY services/concert-round/package.json services/concert-round/

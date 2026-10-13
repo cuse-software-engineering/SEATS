@@ -16,6 +16,9 @@ import { wire as wireBookings } from '@seats/booking/src/infrastructure/index.js
 import { wire as wirePayments } from '@seats/payment/src/infrastructure/index.js';
 import { wire as wireNotifications } from '@seats/notification/src/infrastructure/index.js';
 import { wire as wireStaff } from '@seats/staff-account/src/infrastructure/index.js';
+import { connectBroker as connectBookingBroker } from '@seats/booking/src/infrastructure/index.js';
+import { connectBroker as connectNotificationBroker } from '@seats/notification/src/infrastructure/index.js';
+import { startConsumers as startNotificationConsumers } from '@seats/notification/src/api/consumer.js';
 import { seedStaffAccounts } from '@seats/staff-account/src/domain/index.js';
 import { expireUnpaidBookings } from '@seats/booking/src/domain/index.js';
 import { retryFailedMessages } from '@seats/notification/src/domain/index.js';
@@ -60,6 +63,11 @@ export async function wireMonolith(): Promise<void> {
     countAvailableTables: (roundIds: string[]) => tables.promise.CountAvailableTables({ roundIds }),
     removeRoundTableStatus: (roundId: string) => tables.promise.RemoveRoundTableStatus({ roundId }),
   });
+  // the message broker: in process, shared by this Node process, unless RABBITMQ_URL is set (both services connect
+  // before the hold-expiry job's first tick, so the Notification Service's consumer is registered to receive it)
+  await connectBookingBroker();
+  await connectNotificationBroker();
+  await startNotificationConsumers();
   await seedStaffAccounts();
 }
 

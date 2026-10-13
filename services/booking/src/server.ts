@@ -5,7 +5,7 @@ dotenv.config({ path: '../../.env' });
 
 import { grpcPort } from '@seats/config/src/index.js';
 import { connectPostgres } from './infrastructure/db.js';
-import { wire } from './infrastructure/index.js';
+import { connectBroker, wire } from './infrastructure/index.js';
 import { startGrpc } from './api/grpc.js';
 import { expireUnpaidBookings } from './domain/index.js';
 
@@ -13,6 +13,9 @@ const EXPIRY_JOB_MS = Number(process.env.EXPIRY_JOB_MS ?? 5000);   // ADR-08: ev
 
 // เชื่อมต่อ PostgreSQL (seats_booking) บน Docker
 await connectPostgres();
+
+// เชื่อมต่อ RabbitMQ Message Broker สำหรับส่ง Notification
+await connectBroker();
 
 wire();                                              // the repositories and the gRPC clients behind the domain's ports
 startGrpc(grpcPort('booking'));                      // the only transport (ADR-12): the API Gateway calls it by gRPC

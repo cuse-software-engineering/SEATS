@@ -5,6 +5,8 @@
 import assert from 'node:assert/strict';
 import * as d from '../src/domain/index.js';
 import { concertRound, tableAvailability } from '../src/infrastructure/clients.js';
+import { events } from '../src/infrastructure/broker.js';
+import type { HoldExpiredEvent } from '../src/domain/ports.js';
 import type { Round__Output } from '@seats/proto/gen/seats/concertround/v1/Round';
 import type { RoundTable__Output } from '@seats/proto/gen/seats/concertround/v1/RoundTable';
 import type { TableRef } from '@seats/proto/gen/seats/tableavailability/v1/TableRef';
@@ -36,19 +38,20 @@ export const asTable = (req: TableRef | HoldTableRequest, status: string): Table
 /** A refusal of a collaborator as its gRPC client passes it through (the domain reads it with refusalOf()). */
 export const grpcError = (code: number, message = 'refused'): Error => Object.assign(new Error(message), { code });
 
-/** What the stubbed Table Availability Service received. */
-export const calls: { holds: HoldTableRequest[]; releases: TableRef[] } = { holds: [], releases: [] };
+/** What the stubbed Table Availability Service received, and the events published on the message broker. */
+export const calls: { holds: HoldTableRequest[]; releases: TableRef[]; events: HoldExpiredEvent[] } = { holds: [], releases: [], events: [] };
 
 /** The collaborators as they answer by default: the round above, the package prices of its two table types with an
  *  extra-person fee of 600 (BRULE-09), the check-in window of BRULE-04/05, a read model that accepts every hold and
- *  release. Call it in beforeEach, after resetStore(). */
+ *  release, a message broker that accepts every publish. Call it in beforeEach, after resetStore(). */
 export function stubCollaborators(): void {
-  calls.holds = []; calls.releases = [];
+  calls.holds = []; calls.releases = []; calls.events = [];
   concertRound.getRound = async () => round();
   concertRound.getRoundPricing = async (roundId) => ({ roundId, prices: [{ zoneId: 'A', tableTypeId: 'sofa6', packagePrice: 7200, packageContent: '' }, { zoneId: 'A', tableTypeId: 'round2', packagePrice: 2400, packageContent: '' }], extraPersonFee: 600 });
   concertRound.getCheckInWindow = async (roundId) => ({ roundId, opensAt: '2026-12-24T18:00:00.000Z', startAt: '2026-12-24T20:00:00.000Z', graceEndsAt: '2026-12-24T20:30:00.000Z' });
   tableAvailability.holdTable = async (req) => { calls.holds.push(req); return asTable(req, 'HELD'); };
   tableAvailability.releaseHold = async (req) => { calls.releases.push(req); return asTable(req, 'AVAILABLE'); };
+  events.holdExpired = async (event) => { calls.events.push(event); };
 }
 
 /** Runs `run` with console.log and console.warn swallowed (the expiry job logs the notice it would send and its retries). */
