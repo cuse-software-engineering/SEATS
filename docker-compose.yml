@@ -1,6 +1,6 @@
 # Local deployment of the MVP services (Deliverable 3). `docker compose up --build`, then demo/rest-demo.sh.
 # Ports: gateway REST 4000 (the only REST API, ADR-12); gRPC: concert-round 5001, booking 5002, table-availability 5003,
-# payment 5004, notification 5005, staff-account 5006.
+# payment 5004, notification 5005, staff-account 5006; the message broker, RabbitMQ, 5672 (management UI 15672).
 services:
   gateway:
     build: { context: ., args: { SERVICE: gateway } }
@@ -29,12 +29,17 @@ services:
     environment:
       CONCERT_ROUND_GRPC: concert-round:5001
       TABLE_AVAILABILITY_GRPC: table-availability:5003
+      RABBITMQ_URL: amqp://rabbitmq:5672
+    depends_on: [rabbitmq]
   payment:
     build: { context: ., args: { SERVICE: services/payment } }
     ports: ["5004:5004"]
   notification:
     build: { context: ., args: { SERVICE: services/notification } }
     ports: ["5005:5005"]
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+    depends_on: [rabbitmq]
   staff-account:
     build: { context: ., args: { SERVICE: services/staff-account } }
     ports: ["5006:5006"]
@@ -44,5 +49,11 @@ services:
   # MongoDB per service comes when a service swaps its in-memory store for Mongoose (ADR-06); concert-round is first
   # (above), the others still run in memory:
   # mongo-booking: { image: mongo:7, ports: ["27017:27017"] }
+  # The message broker (one shared bus, unlike a database per service): the Booking Service's hold-expiry job
+  # publishes to it, the Notification Service consumes from it (@seats/messaging, RABBITMQ_URL). The management UI
+  # is on :15672 (guest/guest) for watching the queue while the demo runs.
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports: ["5672:5672", "15672:15672"]
 volumes:
   mongo-concert-round-data: {}

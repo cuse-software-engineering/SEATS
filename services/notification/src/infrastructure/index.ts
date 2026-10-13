@@ -6,6 +6,7 @@ import { messages } from './repositories.js';
 import { adapters } from './adapters.js';
 export { connectStore, disconnectStore, resetStore, store } from './store.js';
 export { adapters } from './adapters.js';
+export { connectBroker, disconnectBroker } from './broker.js';
 
 export function wire(): void {
   // one delegate per method, so a test that sets failNext or swaps adapters.lineMessaging after wire() is followed

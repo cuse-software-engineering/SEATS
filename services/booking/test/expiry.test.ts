@@ -5,8 +5,9 @@ import { beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as d from '../src/domain/index.js';
 import { concertRound, tableAvailability } from '../src/infrastructure/clients.js';
+import { events } from '../src/infrastructure/broker.js';
 import { resetStore, wire } from '../src/infrastructure/index.js';
-import { calls, MALEE, MINUTE, quietly, rejected, round, SOMCHAI, stubCollaborators } from './fixtures.js';
+import { calls, expire, MALEE, MINUTE, quietly, rejected, round, SOMCHAI, stubCollaborators } from './fixtures.js';
 
 wire();   // binds the in-memory repositories and the client objects to the domain's ports
 
@@ -33,6 +34,20 @@ describe('expireUnpaidBookings', () => {
     assert.deepEqual(e.history.map((h) => [h.status, h.by]), [['Held', SOMCHAI], ['Expired', 'hold-expiry job']]);
     assert.equal((await d.getBooking(later.id, MALEE)).status, 'Held');
     assert.deepEqual(calls.releases, [{ roundId: 'r1', tableNumber: 1, bookingId: overdue.id }]);
+  });
+
+  test('publishes a HoldExpiredEvent for the Notification Service, named with the round', async () => {
+    const b = await hold(SOMCHAI, 1);
+    await expire(b);
+    assert.deepEqual(calls.events, [{ bookingId: b.id, customerId: SOMCHAI, roundId: 'r1', roundName: 'Friday Live', tableNumber: 1 }]);
+  });
+
+  test('a broker that refuses the publish: the booking is Expired all the same, a warning logged, the id answered', async () => {
+    const b = await hold();
+    events.holdExpired = async () => { throw new Error('the broker did not answer'); };
+    const warned: string[] = []; const { log, warn } = console; console.log = () => {}; console.warn = (line: string) => { warned.push(line); };
+    try { assert.deepEqual(await d.expireUnpaidBookings(Date.parse(b.holdEndsAt) + MINUTE), [b.id]); } finally { console.log = log; console.warn = warn; }
+    assert.deepEqual([await status(b), warned.some((w) => w.includes('holdExpired publish retry later'))], ['Expired', true]);
   });
 });
 

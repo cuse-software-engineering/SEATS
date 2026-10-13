@@ -1,0 +1,19 @@
+{
+  "name": "@seats/messaging",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The message broker a service's domain events travel on: one Broker contract with an in-process implementation for development and tests and a RabbitMQ implementation through amqplib, chosen by configuration. Unlike @seats/store (one database per service), the broker is one shared bus every service connects to.",
+  "scripts": {
+    "test": "node --import tsx --test 'test/*.test.ts'",
+    "typecheck": "tsc -p . --noEmit",
+    "build": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@seats/errors": "*",
+    "amqplib": "^0.10.4"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.5"
+  }
+}
