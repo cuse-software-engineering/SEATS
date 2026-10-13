@@ -6,9 +6,15 @@ import { isGrpcServiceError } from '@seats/errors/src/index.js';
 import { randomUUID } from 'node:crypto';
 import express, { type Request, type Response } from 'express';
 import grpc from '@grpc/grpc-js';
+import jwt from 'jsonwebtoken';
 import { DEADLINE_MS, healthOf } from './clients.js';
 import { adapters } from './adapters.js';
 import { ROUTES, type Role, type Route } from './routes.js';
+
+// Auth Routes
+import authRoutes from './routes/auth.routes.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'seats-jwt-secret-key-change-in-prod';
 
 const HTTP_STATUS: Partial<Record<grpc.status, number>> = {
   [grpc.status.INVALID_ARGUMENT]: 400, [grpc.status.UNAUTHENTICATED]: 401, [grpc.status.PERMISSION_DENIED]: 403, [grpc.status.NOT_FOUND]: 404,
@@ -28,22 +34,46 @@ const unary = <Res>(run: (cb: grpc.requestCallback<Res>) => void) =>
 
 function mountHealth(app: express.Express): void {
   app.get('/health', async (_req, res) => {
-  const services = await Promise.all(Object.entries(healthOf).map(async ([service, client]) => {
-    const ok = await unary<{ status: number }>((cb) => client.check({}, { deadline: Date.now() + DEADLINE_MS }, cb)).then((r) => r.status === 1).catch(() => false);
-    return { service, ok };
-  }));
-  res.json({ service: 'gateway', ok: services.every((s) => s.ok), services });
+    const services = await Promise.all(Object.entries(healthOf).map(async ([service, client]) => {
+      const ok = await unary<{ status: number }>((cb) => client.check({}, { deadline: Date.now() + DEADLINE_MS }, cb)).then((r) => r.status === 1).catch(() => false);
+      return { service, ok };
+    }));
+    res.json({ service: 'gateway', ok: services.every((s) => s.ok), services });
   });
 }
 
-/** Who calls: the progress-1 headers x-user-id and x-role, or a LINE ID token as `Authorization: Bearer` verified by the LINE Login Adapter (a customer). */
+/** Who calls: 
+ * 1. Our JWT Token (Bearer <token>)
+ * 2. Fake auth headers (x-user-id, x-role)
+ * 3. LINE ID token via LINE Login Adapter
+ */
 async function identify(req: Request): Promise<{ userId: string; role: Role | '' }> {
+  // 1. Check Bearer Token (JWT or LINE)
+  const authHeader = req.get('authorization') ?? '';
+  const token = /^Bearer\s+(.+)$/i.exec(authHeader)?.[1];
+
+  if (token) {
+    // Try verifying as our JWT Token first
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id?: string; userId?: string; role?: Role };
+      const userId = decoded.id || decoded.userId || '';
+      const role = decoded.role || 'customer';
+      if (userId) return { userId, role };
+    } catch {
+      // If JWT verification fails, proceed to test LINE token
+    }
+
+    // Fallback: Verify LINE ID token
+    const line = await adapters.lineLogin.verifyIdToken(token).catch(() => null);
+    if (line) return { userId: line.userId, role: 'customer' };
+  }
+
+  // 2. Check Progress-1 Fake Auth Headers fallback
   const userId = req.get('x-user-id') ?? '';
   const role = (req.get('x-role') ?? '') as Role | '';
   if (userId && role) return { userId, role };
-  const token = /^Bearer\s+(.+)$/i.exec(req.get('authorization') ?? '')?.[1];
-  const line = token ? await adapters.lineLogin.verifyIdToken(token) : null;
-  return line ? { userId: line.userId, role: 'customer' } : { userId: '', role: '' };
+
+  return { userId: '', role: '' };
 }
 
 const handle = (route: Route) => async (req: Request, res: Response) => {
@@ -52,7 +82,7 @@ const handle = (route: Route) => async (req: Request, res: Response) => {
   line(n, `req ${role || 'anonymous'}:${userId || '-'} ${req.method} ${req.originalUrl} -> gRPC ${route.label}`);
   const log = (status: number, note?: string) => line(n, `res ${req.method} ${req.originalUrl} ${status} (${Date.now() - started} ms)${note ? ` ${note}` : ''}`);
   if (route.auth !== 'none') {
-    if (!userId || !role) { log(401); res.status(401).json({ error: 'no identity: send a LINE ID token as Authorization: Bearer, or the headers x-user-id and x-role (fake auth, progress 1)' }); return; }
+    if (!userId || !role) { log(401); res.status(401).json({ error: 'no identity: send a Bearer JWT Token, LINE ID token, or the headers x-user-id and x-role' }); return; }
     if (!route.roles.includes(role)) { log(403, `role ${role} may not`); res.status(403).json({ error: `role ${role} may not ${req.method} ${req.path}` }); return; }   // FR-66
   }
   const metadata = new grpc.Metadata();
@@ -84,14 +114,16 @@ const handle = (route: Route) => async (req: Request, res: Response) => {
   }
 };
 
-
-/** The gateway as an Express app: JSON body, health, one handler per route, JSON 404. */
+/** The gateway as an Express app: JSON body, health, auth routes, one handler per route, JSON 404. */
 export function createApp(): express.Express {
   const app = express();
   app.use(express.json({ limit: '2mb' }));
   mountHealth(app);
+
+  // Mount Auth Routes (/api/v1/auth/login, /api/v1/auth/register)
+  app.use('/api/v1/auth', authRoutes);
+
   for (const route of ROUTES) app[route.method.toLowerCase() as 'get' | 'post' | 'put' | 'delete'](route.path, handle(route));
   app.use((req, res) => { res.status(404).json({ error: `no route for ${req.method} ${req.path}` }); });
   return app;
 }
-

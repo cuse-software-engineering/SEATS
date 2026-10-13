@@ -1,6 +1,3 @@
-# Local deployment of the MVP services (Deliverable 3). `docker compose up --build`, then demo/rest-demo.sh.
-# Ports: gateway REST 4000 (the only REST API, ADR-12); gRPC: concert-round 5001, booking 5002, table-availability 5003,
-# payment 5004, notification 5005, staff-account 5006.
 services:
   gateway:
     build: { context: ., args: { SERVICE: gateway } }
@@ -12,37 +9,61 @@ services:
       PAYMENT_GRPC: payment:5004
       NOTIFICATION_GRPC: notification:5005
       STAFF_ACCOUNT_GRPC: staff-account:5006
+      JWT_SECRET: ${JWT_SECRET:-seats_super_secret_key_2026_dev_mode_987654321}
     depends_on: [concert-round, booking, table-availability, payment, notification, staff-account]
+
   concert-round:
     build: { context: ., args: { SERVICE: services/concert-round } }
     ports: ["5001:5001"]
     environment:
       TABLE_AVAILABILITY_GRPC: table-availability:5003
-      CONCERT_ROUND_MONGO_URL: mongodb://mongo-concert-round:27017/concert-round
-    depends_on: [mongo-concert-round]
+      CONCERT_ROUND_MONGO_URL: ${CONCERT_ROUND_MONGO_URL}
+
   table-availability:
     build: { context: ., args: { SERVICE: services/table-availability } }
     ports: ["5003:5003"]
+    environment:
+      TABLE_AVAILABILITY_MONGO_URL: ${TABLE_AVAILABILITY_MONGO_URL}
+
   booking:
     build: { context: ., args: { SERVICE: services/booking } }
     ports: ["5002:5002"]
     environment:
       CONCERT_ROUND_GRPC: concert-round:5001
       TABLE_AVAILABILITY_GRPC: table-availability:5003
+      BOOKING_POSTGRES_URL: postgresql://seats_admin:seats_password123@postgres-db:5432/seats_booking
+    depends_on: [postgres-db]
+
   payment:
     build: { context: ., args: { SERVICE: services/payment } }
     ports: ["5004:5004"]
+    environment:
+      PAYMENT_POSTGRES_URL: postgresql://seats_admin:seats_password123@postgres-db:5432/seats_payment
+    depends_on: [postgres-db]
+
   notification:
     build: { context: ., args: { SERVICE: services/notification } }
     ports: ["5005:5005"]
+    environment:
+      NOTIFICATION_MONGO_URL: ${NOTIFICATION_MONGO_URL}
+
   staff-account:
     build: { context: ., args: { SERVICE: services/staff-account } }
     ports: ["5006:5006"]
-  mongo-concert-round:
-    image: mongo:7
-    volumes: ["mongo-concert-round-data:/data/db"]
-  # MongoDB per service comes when a service swaps its in-memory store for Mongoose (ADR-06); concert-round is first
-  # (above), the others still run in memory:
-  # mongo-booking: { image: mongo:7, ports: ["27017:27017"] }
+    environment:
+      STAFF_ACCOUNT_MONGO_URL: ${STAFF_ACCOUNT_MONGO_URL}
+
+  postgres-db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: seats_admin
+      POSTGRES_PASSWORD: seats_password123
+      POSTGRES_DB: seats_booking
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+
 volumes:
-  mongo-concert-round-data: {}
+  postgres-data: {}

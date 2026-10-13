@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: '../../.env' }); // ชี้ออกไปดึง .env จาก Root
 import { grpcPort } from '@seats/config/src/index.js';
 import { connectStore, wire } from './infrastructure/index.js';
 import { startGrpc } from './api/grpc.js';

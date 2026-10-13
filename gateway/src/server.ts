@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { gatewayPort } from '@seats/config/src/index.js';
 import { ADDRESSES } from './clients.js';
 import { ROUTES } from './routes.js';

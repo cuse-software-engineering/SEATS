@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: '../../.env' });
 // The composition root of the Concert Round Service process: the Round DB, the ports, then the gRPC transport.
 import { grpcPort } from '@seats/config/src/index.js';
 import { connectStore, wire } from './infrastructure/index.js';

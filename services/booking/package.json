@@ -16,9 +16,11 @@
     "@grpc/proto-loader": "^0.7.13",
     "@seats/config": "*",
     "@seats/errors": "*",
-    "@seats/store": "*"
+    "@seats/store": "*",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@seats/proto": "*"
+    "@seats/proto": "*",
+    "@types/pg": "^8.23.1"
   }
 }
